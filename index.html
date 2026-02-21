@@ -1305,6 +1305,15 @@
                             <!-- Populated dynamically -->
                         </div>
                     </div>
+
+                    <div class="text-xs text-gray-600 mb-6 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
+                        <h4 class="font-bold text-yellow-800 mb-2">Phone Booking Reminders:</h4>
+                        <ul class="list-disc list-inside space-y-1">
+                            <li>Confirm the client is <strong>not pregnant</strong>, is <strong>under 350 lbs</strong>, and will <strong>not have contrast injected</strong> in the 7 before testing.</li>
+                            <li>Mention that our protocols and waiver/terms are in the booking confirmation email and calendar. By attending the appointment, the customer is agreeing to those.</li>
+                            <li>Remember to mention the <strong>cancellation policy</strong>.</li>
+                        </ul>
+                    </div>
                     
                     <div class="flex gap-4">
                         <button type="button" onclick="closeCustomerModal()" class="btn-secondary flex-1 py-3 rounded-xl font-semibold">Cancel</button>
@@ -1552,11 +1561,19 @@
 
         function goBack() {
             if (state.currentStep > 1) {
+                // If leaving the Calendar/Time slot screen (Step 3), reset selection to force re-search
+                if (state.currentStep === 3) {
+                    state.selectedDate = null;
+                    state.selectedTime = null;
+                    // Reset to current week so they don't get stuck on a far-future week
+                    state.currentWeekStart = getStartOfWeek(new Date());
+                }
+                
                 state.currentStep--;
                 updateStepIndicators();
                 showCurrentStep();
             } else {
-                // Go home if back is pressed
+                // Go home if back is pressed on first step
                 window.location.href = 'https://dexafitkc.com';
             }
         }
@@ -4516,6 +4533,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
