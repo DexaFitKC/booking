@@ -1418,10 +1418,12 @@
         ];
         
         const HARDCODED_QUESTIONS = [
-            { id: '1', type: 'checkbox', required: true, text: 'I agree that I am not pregnant or trying to become pregnant. I am not over 350 lbs. I have not been administered a gastrointestinal contrast or radionuclides in the past 7 days. *', ask: 'every time' },
-            { id: '2', type: 'checkbox', required: true, text: 'I have read the [waiver and consent form](https://dexafitkc.com/documents) and do consent to participate in the services rendered by QFit LLC dba DexaFit KC and/or DexaFit, LLC. *', ask: 'every time' },
-            { id: '3', type: 'checkbox', required: true, text: 'I have fully read the [protocols page](https://dexafitkc.com/protocols) will properly prepare for my appointments. *', ask: 'every time' },
-            { id: '4', type: 'long text', required: false, text: 'Additional Notes:', ask: 'every time' }
+            { id: '1', type: 'checkbox', required: true, text: 'I am not pregnant, do not suspect I may be pregnant, and am not attempting to become pregnant. My weight does not exceed 350 pounds. I have not been administered gastrointestinal contrast or radionuclide agents within the previous 7 days.', ask: 'every time' },
+            { id: '2', type: 'checkbox', required: true, text: 'I have read the [waiver and consent form](https://dexafitkc.com/documents) and do consent to participate in the services rendered by QFit LLC dba DexaFit KC and/or DexaFit, LLC.', ask: 'every time' },
+            { id: '3', type: 'checkbox', required: true, text: 'I have fully read the [protocols page](https://dexafitkc.com/protocols) will properly prepare for my appointments.', ask: 'every time' },
+            { id: '4', type: 'long text', required: false, text: 'Additional Notes:', ask: 'every time' },
+            { id: '5', type: 'short text', required: false, text: 'List any join replacements', ask: 'every time' },
+            { id: '6', type: 'checkbox', required: false, text: 'I have hearing aids', ask: 'every time' }
         ];
 
         const state = {
@@ -1458,7 +1460,9 @@
             { id: '2', type: 'checkbox', required: false, text: 'I agree to the terms and conditions: https://example.com/terms', ask: 'once' },
             { id: '3', type: 'long text', required: false, text: 'Please describe any current symptoms or concerns', ask: 'every time' },
             { id: '4', type: 'number', required: true, text: 'Current weight (lbs)', ask: 'if has changed' },
-            { id: '5', type: 'date', required: false, text: 'Date of last physical exam', ask: 'once' }
+            { id: '5', type: 'date', required: false, text: 'Date of last physical exam', ask: 'once' },
+            { id: '6', type: 'short text', required: false, text: 'List any join replacements', ask: 'every time' },
+            { id: '7', type: 'checkbox', required: false, text: 'I have hearing aids', ask: 'every time' }
         ];
 
         const sampleCustomers = [
@@ -4495,4 +4499,5 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
