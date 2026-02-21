@@ -1410,20 +1410,20 @@
         const CLASS_A_IDS = ['1', '2', '3'];
         const HARDCODED_SERVICES = [
             { id: '1', name: 'DEXA Body Composition Scan', description: 'DEXA (or DXA) scans are the Gold Standard for body composition trusted by research & elite sports labs. FDA-approved technology uses low-dose radiation for body fat percentage (not BMI), total mass, lean tissue mass, bone mineral content (BMC), visceral fat mass, lean tissue mass symmetry, total body bone mineral density (BMD), plus.', duration: 15, price: 149, addonPrice: 139, addonDuration: 15, excludedQuestions: '' },
-            { id: '2', name: 'RMR Resting Metabolic Rate | Fasted Test', description: 'RMR (gas exchange) represents the amount of calories you need to maintain essential functions at rest (things like heartbeat and breathing). Pinpointing the precise number of calories you burn at rest is crucial if you are trying to lose weight or build lean mass. The RMR test will analyze how efficient your body is at converting food to energy, whether you use more fat or sugar as fuel, & if you have a slowed metabolism.', duration: 20, price: 125, addonPrice: 115, addonDuration: 15, excludedQuestions: '1' },
-            { id: '3', name: 'VO2 Max Treadmill Test', description: 'The VO2 Max test pinpoints your precise fitness capacity, pure endurance potential, and cardiovascular degeneration. Learn yours if you want to exercise smarter and avoid overtraining. Proper training at your VO2max improves your body’s power grid. It strengthens your heart, improves blood flow and metabolism, and makes your muscles more efficient. VO2max is a more reliable health and longevity indicator than many other factors.', duration: 30, price: 135, addonPrice: 125, addonDuration: 25, excludedQuestions: '1' },
-            { id: '4', name: 'Styku 3D Body Scan', description: 'This scan is a 3D imager and NOT a DXA scan. We show you how to run the test, and you setup a profile. Scan is emailed to you as a PDF link from Styku™. Wear tight fitting clothing with hair up for most accurate results. See yourself in 3D with measurements from neck to calves.', duration: 5, price: 35, addonPrice: 10, addonDuration: 5, excludedQuestions: '1' },
-            { id: '5', name: 'Grip Strength Evaluation', description: 'Grip strength is a vital marker of overall health and longevity. A Handgrip Strength Test measures your muscle strength, tracks your progress, and supports your fitness goals. Research indicates that a 5-kilogram decline in grip strength corresponds to a 16% increase in the risk of death within four years.', duration: 5, price: 15, addonPrice: 10, addonDuration: 5, excludedQuestions: '1' },
-            { id: '6', name: 'Data Review/Consultation', description: 'If you would like us to go over your test results with you for free, select this option! If not testing, a $20 fee is assesed to discuss results, goals, and next steps.', duration: 30, price: 20, addonPrice: 0, addonDuration: 15, excludedQuestions: '1,3' }
+            { id: '2', name: 'RMR Resting Metabolic Rate | Fasted Test', description: 'RMR (gas exchange) represents the amount of calories you need to maintain essential functions at rest (things like heartbeat and breathing). Pinpointing the precise number of calories you burn at rest is crucial if you are trying to lose weight or build lean mass. The RMR test will analyze how efficient your body is at converting food to energy, whether you use more fat or sugar as fuel, & if you have a slowed metabolism.', duration: 20, price: 125, addonPrice: 115, addonDuration: 15, excludedQuestions: '1,5,6' },
+            { id: '3', name: 'VO2 Max Treadmill Test', description: 'The VO2 Max test pinpoints your precise fitness capacity, pure endurance potential, and cardiovascular degeneration. Learn yours if you want to exercise smarter and avoid overtraining. Proper training at your VO2max improves your body’s power grid. It strengthens your heart, improves blood flow and metabolism, and makes your muscles more efficient. VO2max is a more reliable health and longevity indicator than many other factors.', duration: 30, price: 135, addonPrice: 125, addonDuration: 25, excludedQuestions: '1,5,6' },
+            { id: '4', name: 'Styku 3D Body Scan', description: 'This scan is a 3D imager and NOT a DXA scan. We show you how to run the test, and you setup a profile. Scan is emailed to you as a PDF link from Styku™. Wear tight fitting clothing with hair up for most accurate results. See yourself in 3D with measurements from neck to calves.', duration: 5, price: 35, addonPrice: 10, addonDuration: 5, excludedQuestions: '1,5,6' },
+            { id: '5', name: 'Grip Strength Evaluation', description: 'Grip strength is a vital marker of overall health and longevity. A Handgrip Strength Test measures your muscle strength, tracks your progress, and supports your fitness goals. Research indicates that a 5-kilogram decline in grip strength corresponds to a 16% increase in the risk of death within four years.', duration: 5, price: 15, addonPrice: 10, addonDuration: 5, excludedQuestions: '1,5,6' },
+            { id: '6', name: 'Data Review/Consultation', description: 'If you would like us to go over your test results with you for free, select this option! If not testing, a $20 fee is assesed to discuss results, goals, and next steps.', duration: 30, price: 20, addonPrice: 0, addonDuration: 15, excludedQuestions: '1,3,5,6' }
         ];
         
         const HARDCODED_QUESTIONS = [
             { id: '1', type: 'checkbox', required: true, text: 'I am not pregnant, do not suspect I may be pregnant, and am not attempting to become pregnant. My weight does not exceed 350 pounds. I have not been administered gastrointestinal contrast or radionuclide agents within the previous 7 days.', ask: 'every time' },
+            { id: '5', type: 'short text', required: false, text: 'List any join replacements (optional)', ask: 'every time' },
+            { id: '6', type: 'checkbox', required: false, text: 'Check if you have hearing aids (optional)', ask: 'every time' },
             { id: '2', type: 'checkbox', required: true, text: 'I have read the [waiver and consent form](https://dexafitkc.com/documents) and do consent to participate in the services rendered by QFit LLC dba DexaFit KC and/or DexaFit, LLC.', ask: 'every time' },
             { id: '3', type: 'checkbox', required: true, text: 'I have fully read the [protocols page](https://dexafitkc.com/protocols) will properly prepare for my appointments.', ask: 'every time' },
-            { id: '4', type: 'long text', required: false, text: 'Additional Notes:', ask: 'every time' },
-            { id: '5', type: 'short text', required: false, text: 'List any join replacements', ask: 'every time' },
-            { id: '6', type: 'checkbox', required: false, text: 'I have hearing aids', ask: 'every time' }
+            { id: '4', type: 'long text', required: false, text: 'Additional Notes:', ask: 'every time' }
         ];
 
         const state = {
@@ -4499,5 +4499,6 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
