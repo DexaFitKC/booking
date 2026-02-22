@@ -3629,11 +3629,11 @@
                         const sDef = state.services.find(s => s.name === name);
                         allServices.push({
                             name: name,
-                            price: sDef ? sDef.price : 0, 
-                            addonPrice: sDef ? sDef.addonPrice : 0,
+                            price: parseFloat(sDef ? sDef.price : 0),
+                            addonPrice: parseFloat(sDef ? sDef.addonPrice : 0),
                             customerName: a.name,
                             customerEmail: a.email,
-                            id: sDef ? sDef.id : 'unknown'
+                            id: sDef ? String(sDef.id) : 'unknown'  // normalize ID to string here too
                         });
                     });
                 }
@@ -3795,35 +3795,32 @@
             });
             
             const countA = classA.length;
+            console.log('Services:', services.map(s => ({name: s.name, id: s.id, price: s.price, addonPrice: s.addonPrice})));
+            console.log('countA:', countA);
             
             // 2. Calculate Bundle Totals
             let bundleTotal = 0;
             let originalTotal = 0;
             
             services.forEach(s => {
-                originalTotal += (s.price || 0);
+                const basePrice = parseFloat(s.price) || 0;
+                const addonPrice = (s.addonPrice !== undefined && s.addonPrice !== null) 
+                    ? parseFloat(s.addonPrice) 
+                    : basePrice;
                 
-                // Robust check inside loop as well
-                const idStr = String(s.id);
-                const isClassA = CLASS_A_IDS.includes(idStr) || 
-                                 (s.name.toLowerCase().includes('dexa') || s.name.toLowerCase().includes('rmr') || s.name.toLowerCase().includes('vo2'));
+                originalTotal += basePrice;
                 
-                let currentPrice = s.price;
+                const isClassA = (s.id && CLASS_A_IDS.includes(String(s.id))) || 
+                                 ((s.name || '').toLowerCase().includes('dexa') || 
+                                  (s.name || '').toLowerCase().includes('rmr') || 
+                                  (s.name || '').toLowerCase().includes('vo2'));
+                
+                let currentPrice = basePrice;
                 
                 if (countA >= 2) {
-                    // Rule 4 & 5: All Addon
-                    currentPrice = (s.addonPrice !== undefined && s.addonPrice !== null) ? s.addonPrice : s.price;
+                    currentPrice = addonPrice;
                 } else if (countA === 1) {
-                    if (isClassA) {
-                        // Rule 2: A is Base
-                        currentPrice = s.price;
-                    } else {
-                        // Rule 2: B is Addon
-                        currentPrice = (s.addonPrice !== undefined && s.addonPrice !== null) ? s.addonPrice : s.price;
-                    }
-                } else {
-                    // Rule 3: All Base
-                    currentPrice = s.price;
+                    currentPrice = isClassA ? basePrice : addonPrice;
                 }
                 
                 bundleTotal += currentPrice;
@@ -4541,6 +4538,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
