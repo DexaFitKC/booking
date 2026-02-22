@@ -3785,11 +3785,10 @@
     // 1. Classify Services
     // Robust checks: Convert ID to String for comparison, and use lowercase for name matching.
     const classA = services.filter(s => {
-        // Check ID (convert to string to handle numbers from backend)
-        if(s.id && CLASS_A_IDS.includes(String(s.id))) return true;
-        
-        // Fallback name match (ensure lowercase comparison)
-        const name = s.name.toLowerCase();
+        // Normalize ID to string for comparison
+        if (s.id && CLASS_A_IDS.includes(String(s.id))) return true;
+        // Fallback name match
+        const name = (s.name || '').toLowerCase();
         return name.includes('dexa') || name.includes('rmr') || name.includes('vo2');
     });
     
@@ -3802,25 +3801,27 @@
     services.forEach(s => {
         originalTotal += (s.price || 0);
         
-        // Robust check inside loop as well
+        // Same robust check
         const isClassA = (s.id && CLASS_A_IDS.includes(String(s.id))) || 
-                         (s.name.toLowerCase().includes('dexa') || s.name.toLowerCase().includes('rmr') || s.name.toLowerCase().includes('vo2'));
+                         ((s.name || '').toLowerCase().includes('dexa') || 
+                          (s.name || '').toLowerCase().includes('rmr') || 
+                          (s.name || '').toLowerCase().includes('vo2'));
         
         let currentPrice = s.price;
         
         if (countA >= 2) {
-            // Rule 4 & 5: All Addon
+            // ALL services get addon price (including Class A)
             currentPrice = (s.addonPrice !== undefined && s.addonPrice !== null) ? s.addonPrice : s.price;
         } else if (countA === 1) {
             if (isClassA) {
-                // Rule 2: A is Base
+                // The single Class A stays at base
                 currentPrice = s.price;
             } else {
-                // Rule 2: B is Addon
+                // Class B gets addon price
                 currentPrice = (s.addonPrice !== undefined && s.addonPrice !== null) ? s.addonPrice : s.price;
             }
         } else {
-            // Rule 3: All Base
+            // No Class A — all base
             currentPrice = s.price;
         }
         
@@ -4539,6 +4540,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
