@@ -1691,103 +1691,10 @@
             state.currentStep = 2;
             updateStepIndicators();
             showCurrentStep();
-            loadServices();
         }
 
         function validateEmail(email) {
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-        }
-
-        async function loadServices() {
-            const container = document.getElementById('services-grid');
-            container.innerHTML = `<div class="spinner"></div>`;
-        
-            // 1. Load Base Services
-            let servicesData = HARDCODED_SERVICES.map(s => ({
-                ...s,
-                price: parseFloat(s.price),
-                duration: parseInt(s.duration),
-                addonPrice: parseFloat(s.addonPrice),
-                addonDuration: parseInt(s.addonDuration)
-            }));
-        
-            // 2. Handle "Free Styku" Logic for New Customers
-            // If customer is NOT existing, find Styku (ID '4') and modify it
-            if (!state.existingCustomer) {
-                const stykuIndex = servicesData.findIndex(s => s.id === '4');
-                if (stykuIndex !== -1) {
-                    servicesData[stykuIndex] = {
-                        ...servicesData[stykuIndex],
-                        name: 'New Customer Free Styku Offer',
-                        price: 0, // Free
-                        addonPrice: 0, // Free as addon too
-                        // Keep description and duration
-                    };
-                }
-            }
-        
-            state.services = servicesData;
-        
-            container.innerHTML = state.services.map(service => {
-                // Description Logic
-                const shortDesc = service.description || '';
-                const isLong = shortDesc.length > 80;
-                const displayDesc = isLong ? shortDesc.substring(0, 80) + '...' : shortDesc;
-        
-                // Strikethrough Logic preparation
-                const hasDiffPrice = service.addonPrice !== service.price;
-                const hasDiffDuration = service.addonDuration !== service.duration;
-                const hasBundle = hasDiffPrice || hasDiffDuration;
-        
-                return `
-                <div class="service-card glass-card rounded-2xl p-6 border-2 border-transparent cursor-pointer" 
-                     data-service-id="${service.id}" onclick="toggleService('${service.id}')">
-                    <div class="flex items-start justify-between mb-4">
-                        <h3 class="font-bold text-lg">${service.name}</h3>
-                        <div class="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center service-checkbox transition-all">
-                            <svg class="w-4 h-4 text-white hidden check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                        </div>
-                    </div>
-                    
-                    <div class="text-gray-600 text-sm mb-4">
-                        <span class="desc-short">${displayDesc}</span>
-                        ${isLong ? `<span class="desc-full hidden">${shortDesc}</span><button class="text-blue-500 text-xs ml-1 hover:underline" onclick="event.stopPropagation(); toggleDesc(this)">Show more</button>` : ''}
-                    </div>
-        
-                    <!-- Duration Row -->
-                    <div class="flex items-center justify-between text-sm mb-2">
-                        <span class="text-gray-500">Duration</span>
-                        <div class="font-semibold text-right">
-                            <span class="base-duration">${service.duration} min</span>
-                            ${hasDiffDuration ? `
-                                <span class="addon-duration hidden">
-                                    <s class="text-gray-400 mr-1">${service.duration} min</s>
-                                    <span class="text-blue-600">${service.addonDuration} min</span>
-                                </span>
-                            ` : ''}
-                        </div>
-                    </div>
-        
-                    <!-- Price Row -->
-                    <div class="flex items-center justify-between text-sm">
-                        <span class="text-gray-500">Price</span>
-                        <div class="font-semibold text-right">
-                            <span class="base-price">$${service.price.toFixed(2)}</span>
-                            ${hasDiffPrice ? `
-                                <span class="addon-price hidden">
-                                    <s class="text-gray-400 mr-1">$${service.price.toFixed(2)}</s>
-                                    <span class="text-blue-600">$${service.addonPrice.toFixed(2)}</span>
-                                </span>
-                            ` : ''}
-                        </div>
-                    </div>
-        
-                    ${getCreditBadge(service)}
-                </div>`;
-            }).join('');
-        
-            updateServiceCardsUI();
-            updateOrderSummary();
         }
         
         // Helper to toggle description expansion
@@ -2486,112 +2393,6 @@
             }
         }
 
-        async function loadBusinessServices() {
-            const container = document.getElementById('services-list');
-            
-            try {
-                const response = await callAppsScript('getServices');
-                state.services = response.services;
-            } catch (error) {
-                state.services = []; // CHANGED
-            }
-
-            container.innerHTML = state.services.map(service => `
-                <div class="glass-card rounded-2xl p-6">
-                    <div class="flex items-start justify-between mb-4">
-                        <h3 class="font-bold text-lg">${service.name}</h3>
-                        <div class="flex gap-2">
-                            <button onclick="editService('${service.id}')" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                </svg>
-                            </button>
-                            <button onclick="deleteService('${service.id}')" class="p-2 hover:bg-red-50 rounded-lg transition-colors">
-                                <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <p class="text-gray-600 text-sm mb-4">${service.description || 'No description'}</p>
-                    <div class="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                            <span class="text-gray-500">Duration</span>
-                            <p class="font-semibold">${service.duration} min</p>
-                        </div>
-                        <div>
-                            <span class="text-gray-500">Price</span>
-                            <p class="font-semibold">$${service.price.toFixed(2)}</p>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function openServiceModal(serviceId = null) {
-            document.getElementById('service-modal').classList.remove('hidden');
-            document.getElementById('service-modal-title').textContent = serviceId ? 'Edit Service' : 'Add Service';
-            
-            if (serviceId) {
-                const service = state.services.find(s => s.id === serviceId);
-                document.getElementById('service-id').value = service.id;
-                document.getElementById('service-name').value = service.name;
-                document.getElementById('service-description').value = service.description || '';
-                document.getElementById('service-duration').value = service.duration;
-                document.getElementById('service-price').value = service.price;
-                document.getElementById('service-addon-price').value = service.addonPrice || '';
-                document.getElementById('service-addon-duration').value = service.addonDuration || '';
-                document.getElementById('service-excluded-questions').value = service.excludedQuestions || '';
-            } else {
-                document.getElementById('service-form').reset();
-                document.getElementById('service-id').value = '';
-            }
-        }
-
-        function closeServiceModal() {
-            document.getElementById('service-modal').classList.add('hidden');
-        }
-
-        function editService(serviceId) {
-            openServiceModal(serviceId);
-        }
-
-        async function saveService(e) {
-            e.preventDefault();
-            
-            const serviceData = {
-                id: document.getElementById('service-id').value || Date.now().toString(),
-                name: document.getElementById('service-name').value,
-                description: document.getElementById('service-description').value,
-                duration: parseInt(document.getElementById('service-duration').value),
-                price: parseFloat(document.getElementById('service-price').value),
-                addonPrice: parseFloat(document.getElementById('service-addon-price').value) || null,
-                addonDuration: parseInt(document.getElementById('service-addon-duration').value) || null,
-                excludedQuestions: document.getElementById('service-excluded-questions').value
-            };
-
-            try {
-                await callAppsScript('saveService', serviceData);
-            } catch (error) {
-                console.log('Demo mode: service saved locally');
-            }
-
-            closeServiceModal();
-            loadBusinessServices();
-        }
-
-        async function deleteService(serviceId) {
-            if (!confirm('Are you sure you want to delete this service?')) return;
-            
-            try {
-                await callAppsScript('deleteService', { id: serviceId });
-            } catch (error) {
-                console.log('Demo mode');
-            }
-            
-            loadBusinessServices();
-        }
-
         async function loadBusinessCustomers() {
             const tbody = document.getElementById('customers-table-body');
             const container = document.getElementById('customers-list');
@@ -3121,13 +2922,14 @@
             if (!state.services || state.services.length === 0) {
                 // We reuse the hardcoded list or fetch if you have a backend call
                 // For now, assuming HARDCODED_SERVICES is available or we fetch
-                try {
-                    const response = await callAppsScript('getServices');
-                    state.services = response.services || [];
-                } catch (e) {
-                    // Fallback to hardcoded if defined in file
-                    if(typeof HARDCODED_SERVICES !== 'undefined') state.services = HARDCODED_SERVICES;
-                }
+                state.services = HARDCODED_SERVICES.map(s => ({
+                    ...s,
+                    price: parseFloat(s.price),
+                    addonPrice: parseFloat(s.addonPrice),
+                    duration: parseInt(s.duration),
+                    addonDuration: parseInt(s.addonDuration),
+                    id: String(s.id)
+                }));
             }
         
             // Load discounts if not already loaded
@@ -4538,6 +4340,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
