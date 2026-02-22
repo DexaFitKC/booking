@@ -3769,7 +3769,7 @@
             recalcCheckoutTotal();
         }
         
-        function recalcCheckoutTotal() {
+                function recalcCheckoutTotal() {
             const services = state.checkoutServicesFlat || [];
             if (services.length === 0) {
                  document.getElementById('co-original').textContent = `$0.00`;
@@ -3882,60 +3882,6 @@
                 discount: discountVal
             };
         }
-    
-    const bundleSavings = originalTotal - bundleTotal;
-
-    // 3. Calculate Credit Savings
-    let creditSavings = 0;
-    Object.entries(state.checkoutCreditsUsed).forEach(([idx, creditId]) => {
-        const s = services[idx];
-        const c = state.checkoutAvailableCredits.find(x => x.id == creditId);
-        if (s && c && c.name.toLowerCase() === s.name.toLowerCase()) {
-            creditSavings += (s.price || 0);
-        }
-    });
-
-    // 4. Calculate GC Savings
-    let gcSavings = 0;
-    if(state.checkoutGCInputs) {
-        Object.values(state.checkoutGCInputs).forEach(val => gcSavings += (parseFloat(val) || 0));
-    }
-
-    // 5. Discount
-    let discountVal = 0;
-    if (state.checkoutDiscount) {
-        const subForDisc = Math.max(0, bundleTotal - creditSavings - gcSavings);
-        if (state.checkoutDiscount.type === 'percent') discountVal = subForDisc * (state.checkoutDiscount.value / 100);
-        else discountVal = state.checkoutDiscount.value;
-    }
-
-    // 6. Final
-    let finalTotal = Math.max(0, bundleTotal - creditSavings - gcSavings - discountVal);
-
-    if (state.checkoutManualOverride !== null && state.checkoutManualOverride >= 0) {
-        finalTotal = state.checkoutManualOverride;
-    }
-
-    // Update UI
-    document.getElementById('co-original').textContent = `$${originalTotal.toFixed(2)}`;
-    document.getElementById('co-bundle-savings').textContent = `-$${bundleSavings.toFixed(2)}`;
-    document.getElementById('co-credit-savings').textContent = `-$${creditSavings.toFixed(2)}`;
-    document.getElementById('co-gc-savings').textContent = `-$${gcSavings.toFixed(2)}`;
-    document.getElementById('co-discount-savings').textContent = `-$${discountVal.toFixed(2)}`;
-    
-    const totalEl = document.getElementById('co-final-total');
-    totalEl.textContent = `$${finalTotal.toFixed(2)}`;
-    totalEl.classList.toggle('text-yellow-600', state.checkoutManualOverride !== null);
-
-    state.checkoutFinalTotal = finalTotal;
-    state.checkoutSavings = {
-        total: bundleSavings + creditSavings + gcSavings + discountVal,
-        bundle: bundleSavings,
-        credits: creditSavings,
-        gc: gcSavings,
-        discount: discountVal
-    };
-}
         
         function closeCheckoutModal() {
             document.getElementById('checkout-process-modal').classList.add('hidden');
@@ -4595,6 +4541,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
