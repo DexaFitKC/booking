@@ -3770,116 +3770,116 @@
         }
         
         function recalcCheckoutTotal() {
-            const services = state.checkoutServicesFlat || [];
-            if (services.length === 0) {
-                 document.getElementById('co-original').textContent = `$0.00`;
-                 document.getElementById('co-bundle-savings').textContent = `$0.00`;
-                 document.getElementById('co-credit-savings').textContent = `$0.00`;
-                 document.getElementById('co-gc-savings').textContent = `$0.00`;
-                 document.getElementById('co-discount-savings').textContent = `$0.00`;
-                 document.getElementById('co-final-total').textContent = `$0.00`;
-                 state.checkoutFinalTotal = 0;
-                 return;
-            }
+    const services = state.checkoutServicesFlat || [];
+    if (services.length === 0) {
+         document.getElementById('co-original').textContent = `$0.00`;
+         document.getElementById('co-bundle-savings').textContent = `$0.00`;
+         document.getElementById('co-credit-savings').textContent = `$0.00`;
+         document.getElementById('co-gc-savings').textContent = `$0.00`;
+         document.getElementById('co-discount-savings').textContent = `$0.00`;
+         document.getElementById('co-final-total').textContent = `$0.00`;
+         state.checkoutFinalTotal = 0;
+         return;
+    }
 
-            // 1. Classify Services
-            // We use name matching here because checkout services might not have IDs if manually added or looked up loosely
-            // But let's try to use ID if available, fallback to name matching against HARDCODED_SERVICES
-            const classA = services.filter(s => {
-                if(s.id && CLASS_A_IDS.includes(s.id)) return true;
-                // Fallback name match
-                const name = s.name.toLowerCase();
-                return name.includes('dexa') || name.includes('rmr') || name.includes('vo2');
-            });
-            
-            const countA = classA.length;
-            
-            // 2. Calculate Bundle Totals
-            let bundleTotal = 0;
-            let originalTotal = 0;
-            
-            services.forEach(s => {
-                originalTotal += (s.price || 0);
-                
-                const isClassA = (s.id && CLASS_A_IDS.includes(s.id)) || 
-                                 (s.name.toLowerCase().includes('dexa') || s.name.toLowerCase().includes('rmr') || s.name.toLowerCase().includes('vo2'));
-                
-                let currentPrice = s.price;
-                
-                if (countA >= 2) {
-                    // Rule 4 & 5: All Addon
-                    currentPrice = (s.addonPrice !== undefined && s.addonPrice !== null) ? s.addonPrice : s.price;
-                } else if (countA === 1) {
-                    if (isClassA) {
-                        // Rule 2: A is Base
-                        currentPrice = s.price;
-                    } else {
-                        // Rule 2: B is Addon
-                        currentPrice = (s.addonPrice !== undefined && s.addonPrice !== null) ? s.addonPrice : s.price;
-                    }
-                } else {
-                    // Rule 3: All Base
-                    currentPrice = s.price;
-                }
-                
-                bundleTotal += currentPrice;
-            });
-            
-            const bundleSavings = originalTotal - bundleTotal;
+    // 1. Classify Services
+    // Robust checks: Convert ID to String for comparison, and use lowercase for name matching.
+    const classA = services.filter(s => {
+        // Check ID (convert to string to handle numbers from backend)
+        if(s.id && CLASS_A_IDS.includes(String(s.id))) return true;
         
-            // 3. Calculate Credit Savings
-            let creditSavings = 0;
-            Object.entries(state.checkoutCreditsUsed).forEach(([idx, creditId]) => {
-                const s = services[idx];
-                const c = state.checkoutAvailableCredits.find(x => x.id == creditId);
-                if (s && c && c.name.toLowerCase() === s.name.toLowerCase()) {
-                    // Credits cover the price of the service (using the calculated bundle logic for fairness)
-                    // Simplified: Credits usually cover base price. 
-                    creditSavings += (s.price || 0);
-                }
-            });
+        // Fallback name match (ensure lowercase comparison)
+        const name = s.name.toLowerCase();
+        return name.includes('dexa') || name.includes('rmr') || name.includes('vo2');
+    });
+    
+    const countA = classA.length;
+    
+    // 2. Calculate Bundle Totals
+    let bundleTotal = 0;
+    let originalTotal = 0;
+    
+    services.forEach(s => {
+        originalTotal += (s.price || 0);
         
-            // 4. Calculate GC Savings
-            let gcSavings = 0;
-            if(state.checkoutGCInputs) {
-                Object.values(state.checkoutGCInputs).forEach(val => gcSavings += (parseFloat(val) || 0));
+        // Robust check inside loop as well
+        const isClassA = (s.id && CLASS_A_IDS.includes(String(s.id))) || 
+                         (s.name.toLowerCase().includes('dexa') || s.name.toLowerCase().includes('rmr') || s.name.toLowerCase().includes('vo2'));
+        
+        let currentPrice = s.price;
+        
+        if (countA >= 2) {
+            // Rule 4 & 5: All Addon
+            currentPrice = (s.addonPrice !== undefined && s.addonPrice !== null) ? s.addonPrice : s.price;
+        } else if (countA === 1) {
+            if (isClassA) {
+                // Rule 2: A is Base
+                currentPrice = s.price;
+            } else {
+                // Rule 2: B is Addon
+                currentPrice = (s.addonPrice !== undefined && s.addonPrice !== null) ? s.addonPrice : s.price;
             }
-        
-            // 5. Discount
-            let discountVal = 0;
-            if (state.checkoutDiscount) {
-                const subForDisc = Math.max(0, bundleTotal - creditSavings - gcSavings);
-                if (state.checkoutDiscount.type === 'percent') discountVal = subForDisc * (state.checkoutDiscount.value / 100);
-                else discountVal = state.checkoutDiscount.value;
-            }
-        
-            // 6. Final
-            let finalTotal = Math.max(0, bundleTotal - creditSavings - gcSavings - discountVal);
-        
-            if (state.checkoutManualOverride !== null && state.checkoutManualOverride >= 0) {
-                finalTotal = state.checkoutManualOverride;
-            }
-        
-            // Update UI
-            document.getElementById('co-original').textContent = `$${originalTotal.toFixed(2)}`;
-            document.getElementById('co-bundle-savings').textContent = `-$${bundleSavings.toFixed(2)}`;
-            document.getElementById('co-credit-savings').textContent = `-$${creditSavings.toFixed(2)}`;
-            document.getElementById('co-gc-savings').textContent = `-$${gcSavings.toFixed(2)}`;
-            document.getElementById('co-discount-savings').textContent = `-$${discountVal.toFixed(2)}`;
-            
-            const totalEl = document.getElementById('co-final-total');
-            totalEl.textContent = `$${finalTotal.toFixed(2)}`;
-            totalEl.classList.toggle('text-yellow-600', state.checkoutManualOverride !== null);
-        
-            state.checkoutFinalTotal = finalTotal;
-            state.checkoutSavings = {
-                total: bundleSavings + creditSavings + gcSavings + discountVal,
-                bundle: bundleSavings,
-                credits: creditSavings,
-                gc: gcSavings,
-                discount: discountVal
-            };
+        } else {
+            // Rule 3: All Base
+            currentPrice = s.price;
         }
+        
+        bundleTotal += currentPrice;
+    });
+    
+    const bundleSavings = originalTotal - bundleTotal;
+
+    // 3. Calculate Credit Savings
+    let creditSavings = 0;
+    Object.entries(state.checkoutCreditsUsed).forEach(([idx, creditId]) => {
+        const s = services[idx];
+        const c = state.checkoutAvailableCredits.find(x => x.id == creditId);
+        if (s && c && c.name.toLowerCase() === s.name.toLowerCase()) {
+            creditSavings += (s.price || 0);
+        }
+    });
+
+    // 4. Calculate GC Savings
+    let gcSavings = 0;
+    if(state.checkoutGCInputs) {
+        Object.values(state.checkoutGCInputs).forEach(val => gcSavings += (parseFloat(val) || 0));
+    }
+
+    // 5. Discount
+    let discountVal = 0;
+    if (state.checkoutDiscount) {
+        const subForDisc = Math.max(0, bundleTotal - creditSavings - gcSavings);
+        if (state.checkoutDiscount.type === 'percent') discountVal = subForDisc * (state.checkoutDiscount.value / 100);
+        else discountVal = state.checkoutDiscount.value;
+    }
+
+    // 6. Final
+    let finalTotal = Math.max(0, bundleTotal - creditSavings - gcSavings - discountVal);
+
+    if (state.checkoutManualOverride !== null && state.checkoutManualOverride >= 0) {
+        finalTotal = state.checkoutManualOverride;
+    }
+
+    // Update UI
+    document.getElementById('co-original').textContent = `$${originalTotal.toFixed(2)}`;
+    document.getElementById('co-bundle-savings').textContent = `-$${bundleSavings.toFixed(2)}`;
+    document.getElementById('co-credit-savings').textContent = `-$${creditSavings.toFixed(2)}`;
+    document.getElementById('co-gc-savings').textContent = `-$${gcSavings.toFixed(2)}`;
+    document.getElementById('co-discount-savings').textContent = `-$${discountVal.toFixed(2)}`;
+    
+    const totalEl = document.getElementById('co-final-total');
+    totalEl.textContent = `$${finalTotal.toFixed(2)}`;
+    totalEl.classList.toggle('text-yellow-600', state.checkoutManualOverride !== null);
+
+    state.checkoutFinalTotal = finalTotal;
+    state.checkoutSavings = {
+        total: bundleSavings + creditSavings + gcSavings + discountVal,
+        bundle: bundleSavings,
+        credits: creditSavings,
+        gc: gcSavings,
+        discount: discountVal
+    };
+}
         
         function closeCheckoutModal() {
             document.getElementById('checkout-process-modal').classList.add('hidden');
@@ -4539,6 +4539,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
