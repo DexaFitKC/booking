@@ -1780,6 +1780,11 @@
                 }
             }
 
+            state.services = servicesData;
+            container.innerHTML = state.services.map(service => { /* ... */ }).join('');
+
+        }
+
         // Consultation Service ID
         const CONSULTATION_ID = '6';
         
@@ -4364,6 +4369,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
