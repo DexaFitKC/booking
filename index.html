@@ -1756,6 +1756,30 @@
             });
         }
 
+        async function loadServices() {
+            const container = document.getElementById('services-grid');
+            container.innerHTML = `<div class="spinner"></div>`;
+        
+            let servicesData = HARDCODED_SERVICES.map(s => ({
+                ...s,
+                price: parseFloat(s.price),
+                duration: parseInt(s.duration),
+                addonPrice: parseFloat(s.addonPrice),
+                addonDuration: parseInt(s.addonDuration)
+            }));
+        
+            if (!state.existingCustomer) {
+                const stykuIndex = servicesData.findIndex(s => s.id === '4');
+                if (stykuIndex !== -1) {
+                    servicesData[stykuIndex] = {
+                        ...servicesData[stykuIndex],
+                        name: 'New Customer Free Styku Offer',
+                        price: 0,
+                        addonPrice: 0,
+                    };
+                }
+            }
+
         // Consultation Service ID
         const CONSULTATION_ID = '6';
         
@@ -2928,7 +2952,7 @@
                     addonPrice: parseFloat(s.addonPrice),
                     duration: parseInt(s.duration),
                     addonDuration: parseInt(s.addonDuration),
-                    id: String(s.id)
+                    id: s.id
                 }));
             }
         
@@ -3435,7 +3459,7 @@
                             addonPrice: parseFloat(sDef ? sDef.addonPrice : 0),
                             customerName: a.name,
                             customerEmail: a.email,
-                            id: sDef ? String(sDef.id) : 'unknown'  // normalize ID to string here too
+                            id: sDef ? sDef.id : 'unknown'  // normalize ID to string here too
                         });
                     });
                 }
@@ -3588,7 +3612,7 @@
             // FIX: Convert ID to String for reliable comparison against CLASS_A_IDS strings.
             // FIX: Use .toLowerCase() for name checks to fix VO2 detection.
             const classA = services.filter(s => {
-                const idStr = String(s.id);
+                const idStr = s.id;
                 if (CLASS_A_IDS.includes(idStr)) return true;
                 
                 // Fallback name match
@@ -3612,7 +3636,7 @@
                 
                 originalTotal += basePrice;
                 
-                const isClassA = (s.id && CLASS_A_IDS.includes(String(s.id))) || 
+                const isClassA = (s.id && CLASS_A_IDS.includes(s.id)) || 
                                  ((s.name || '').toLowerCase().includes('dexa') || 
                                   (s.name || '').toLowerCase().includes('rmr') || 
                                   (s.name || '').toLowerCase().includes('vo2'));
@@ -4340,6 +4364,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
