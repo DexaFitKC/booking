@@ -3173,13 +3173,17 @@
         
         // Helper for toggle
         function toggleNoteExpand(btn) {
-            const content = btn.nextElementSibling;
-            if(content.classList.contains('hidden')) {
-                content.classList.remove('hidden');
-                btn.textContent = 'Hide Details';
-            } else {
-                content.classList.add('hidden');
-                btn.textContent = 'Show Details';
+            // Find parent wrapper div, then find the next sibling with class 'notes-content'
+            const wrapper = btn.closest('.flex.gap-2') || btn.parentElement;
+            const content = wrapper.nextElementSibling;
+            if (content && content.classList.contains('notes-content')) {
+                if (content.classList.contains('hidden')) {
+                    content.classList.remove('hidden');
+                    btn.textContent = 'Hide Details';
+                } else {
+                    content.classList.add('hidden');
+                    btn.textContent = 'Show Details';
+                }
             }
         }
         
@@ -4694,6 +4698,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
