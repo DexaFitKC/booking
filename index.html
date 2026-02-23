@@ -404,7 +404,7 @@
             GOOGLE_CALENDAR_ID: 'c_071327a59b8b0603d1e4e8eeb609cb2900c589292ae1fdc8087170f6adf0e89b@group.calendar.google.com',
             
             // Google Apps Script Web App URL
-            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbz3hWZoYGZpqsorE3YzORKLvZJuH1_nvX-0iTlOYIy5AW-Rl-HytIqKkDxzBrARxKZRKQ/exec',
+            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyUCDh4GLd3nHyxh7Mil5Q6HUXJASbUC6ihuWIa_4tyW5j0SXYyFa766Fax31AMqZwfWw/exec',
             
             // Brand colors for JS
             COLORS: {
@@ -746,15 +746,7 @@
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
                                     </svg>
-                                    Today's Bookings
-                                </button>
-                            </li>
-                            <li>
-                                <button onclick="showBusinessSection('tomorrow')" class="sidebar-item w-full text-left px-4 py-3 rounded-xl flex items-center gap-3" data-section="tomorrow">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                    </svg>
-                                    Tomorrow
+                                    Appointments
                                 </button>
                             </li>
                             <li>
@@ -871,6 +863,7 @@
                                         <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Phone</th>
                                         <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Notes</th>
                                         <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
+                                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Book</th>
                                     </tr>
                                 </thead>
                                 <tbody id="customers-table-body">
@@ -880,27 +873,22 @@
                         </div>
                     </div>
 
-                    <!-- Today's Bookings Section -->
+                    <!-- Appointments Section (Consolidated) -->
                     <div id="section-bookings" class="business-section p-8 hidden">
-                        <div class="mb-8">
-                            <h1 class="text-3xl font-black text-gray-900">Today's Bookings</h1>
-                            <p class="text-gray-600" id="today-date-display"></p>
+                        <div class="mb-8 flex items-center justify-between">
+                            <div>
+                                <h1 class="text-3xl font-black text-gray-900">Appointments</h1>
+                                <p class="text-gray-600" id="bookings-date-display"></p>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <input type="date" id="bookings-date" class="input-field px-4 py-2 rounded-xl" onchange="loadAppointmentsForDate(this.value)">
+                            </div>
                         </div>
-                        <div id="today-bookings-list" class="space-y-4">
+                        <div id="bookings-list" class="space-y-4">
                             <!-- Bookings populated dynamically -->
                         </div>
                     </div>
-
-                    <!-- Tomorrow's Bookings Section -->
-                    <div id="section-tomorrow" class="business-section p-8 hidden">
-                        <div class="mb-8">
-                            <h1 class="text-3xl font-black text-gray-900">Tomorrow's Bookings</h1>
-                            <p class="text-gray-600" id="tomorrow-date-display"></p>
-                        </div>
-                        <div id="tomorrow-bookings-list" class="space-y-4">
-                            <!-- Bookings populated dynamically -->
-                        </div>
-                    </div>
+                    
                     <!-- Checkout Section -->
                     <div id="section-checkout" class="business-section p-8 hidden">
                         <div class="mb-8 flex items-center justify-between">
@@ -1001,6 +989,58 @@
                 <!-- List Container -->
                 <div id="packages-list-container" class="space-y-4">
                     <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Appointment Modal -->
+    <div id="edit-appt-modal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0" onclick="closeEditApptModal()"></div>
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="modal-content glass-card rounded-3xl p-8 w-full max-w-lg relative z-10 max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold">Edit Appointment</h2>
+                    <button onclick="closeEditApptModal()" class="p-2 hover:bg-gray-100 rounded-lg">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                
+                <input type="hidden" id="edit-appt-email">
+                <input type="hidden" id="edit-appt-old-title">
+                <input type="hidden" id="edit-appt-old-time">
+                
+                <!-- Date/Time -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Date</label>
+                        <input type="date" id="edit-appt-date" class="input-field w-full px-4 py-3 rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Time</label>
+                        <input type="time" id="edit-appt-time" class="input-field w-full px-4 py-3 rounded-xl">
+                    </div>
+                </div>
+                
+                <!-- Services -->
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold mb-2">Services</label>
+                    <div id="edit-appt-services" class="space-y-2">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+                
+                <!-- Price Estimate -->
+                <div class="mb-6 p-3 bg-blue-50 rounded-xl">
+                    <div class="flex justify-between">
+                        <span class="font-semibold">Estimated Price:</span>
+                        <span id="edit-appt-price" class="font-bold text-blue-600">$0.00</span>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="cancelAppointment()" class="py-3 px-4 rounded-xl font-semibold text-red-600 border-2 border-red-300 hover:bg-red-50 flex-1">Cancel Appointment</button>
+                    <button onclick="saveAppointmentEdit()" class="btn-primary flex-1 py-3 rounded-xl font-semibold">Save Changes</button>
                 </div>
             </div>
         </div>
@@ -1109,6 +1149,19 @@
                 <div class="mb-6 p-4 bg-blue-50 rounded-xl text-center">
                     <p class="text-sm text-gray-500">Payer</p>
                     <h3 id="checkout-payer-name" class="text-xl font-bold text-blue-800"></h3>
+                </div>
+
+                <!-- Crediting Customer (for shared credits) -->
+                <div class="mb-6 p-4 border border-purple-200 rounded-xl bg-purple-50">
+                    <h4 class="font-bold mb-2 text-purple-800">Apply Credits From Another Customer</h4>
+                    <p class="text-xs text-gray-500 mb-3">If someone else's credits should be applied, search for them here.</p>
+                    <div class="flex gap-2">
+                        <input type="email" id="crediting-customer-email" class="input-field flex-1 px-3 py-2 rounded-lg text-sm" placeholder="Credit holder's email...">
+                        <button onclick="addCreditingCustomer()" class="btn-secondary px-4 py-2 rounded-lg text-sm font-semibold">Add</button>
+                    </div>
+                    <div id="crediting-customer-list" class="mt-2 space-y-1">
+                        <!-- Populated dynamically -->
+                    </div>
                 </div>
 
                 <!-- Service List & Credits -->
@@ -1315,9 +1368,10 @@
                         </ul>
                     </div>
                     
-                    <div class="flex gap-4">
+                    <div class="flex gap-3">
                         <button type="button" onclick="closeCustomerModal()" class="btn-secondary flex-1 py-3 rounded-xl font-semibold">Cancel</button>
                         <button type="submit" class="btn-primary flex-1 py-3 rounded-xl font-semibold">Save Customer</button>
+                        <button type="button" onclick="saveAndBook()" class="py-3 px-4 rounded-xl font-semibold text-white" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); box-shadow: 0 4px 15px rgba(34,197,94,0.3);">Save & Book</button>
                     </div>
                 </form>
             </div>
@@ -1625,6 +1679,157 @@
         }
 
         // ============================================
+        // EDIT APPOINTMENT FUNCTIONS
+        // ============================================
+        let editApptState = {};
+        
+        function openEditAppointmentModal(email, encodedServices, encodedTitle, isoTime) {
+            const services = decodeURIComponent(encodedServices);
+            const title = decodeURIComponent(encodedTitle);
+            const apptDate = new Date(isoTime);
+            
+            editApptState = { email, services, title, originalTime: isoTime };
+            
+            document.getElementById('edit-appt-email').value = email;
+            document.getElementById('edit-appt-old-title').value = title;
+            document.getElementById('edit-appt-old-time').value = isoTime;
+            
+            // Set date/time inputs
+            const tzOffset = apptDate.getTimezoneOffset() * 60000;
+            const localDate = new Date(apptDate.getTime() - tzOffset);
+            document.getElementById('edit-appt-date').value = localDate.toISOString().split('T')[0];
+            const h = apptDate.getHours().toString().padStart(2, '0');
+            const m = apptDate.getMinutes().toString().padStart(2, '0');
+            document.getElementById('edit-appt-time').value = `${h}:${m}`;
+            
+            // Populate service checkboxes
+            const currentServices = services.split(',').map(s => s.trim());
+            const container = document.getElementById('edit-appt-services');
+            
+            // Use HARDCODED_SERVICES for the full list
+            const allServices = HARDCODED_SERVICES;
+            
+            container.innerHTML = allServices.map(s => {
+                const checked = currentServices.some(cs => cs.toLowerCase() === s.name.toLowerCase()) ? 'checked' : '';
+                return `
+                    <label class="flex items-center gap-3 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                        <input type="checkbox" class="checkbox-custom" value="${s.name}" data-price="${s.price}" data-addon-price="${s.addonPrice}" ${checked} onchange="recalcEditApptPrice()">
+                        <span>${s.name}</span>
+                        <span class="ml-auto text-sm text-gray-500">$${s.price}</span>
+                    </label>
+                `;
+            }).join('');
+            
+            recalcEditApptPrice();
+            document.getElementById('edit-appt-modal').classList.remove('hidden');
+        }
+        
+        function closeEditApptModal() {
+            document.getElementById('edit-appt-modal').classList.add('hidden');
+        }
+        
+        function recalcEditApptPrice() {
+            const checkboxes = document.querySelectorAll('#edit-appt-services input[type="checkbox"]:checked');
+            let total = 0;
+            const count = checkboxes.length;
+            const classANames = ['DEXA Body Composition Scan', 'RMR Resting Metabolic Rate | Fasted Test', 'VO2 Max Treadmill Test'];
+            
+            let countA = 0;
+            checkboxes.forEach(cb => {
+                if (classANames.some(n => n.toLowerCase() === cb.value.toLowerCase())) countA++;
+            });
+            
+            checkboxes.forEach(cb => {
+                const basePrice = parseFloat(cb.dataset.price) || 0;
+                const addonPrice = parseFloat(cb.dataset.addonPrice) || 0;
+                const isClassA = classANames.some(n => n.toLowerCase() === cb.value.toLowerCase());
+                
+                if (countA >= 2) {
+                    total += addonPrice;
+                } else if (countA === 1 && !isClassA) {
+                    total += addonPrice;
+                } else {
+                    total += basePrice;
+                }
+            });
+            
+            document.getElementById('edit-appt-price').textContent = `$${total.toFixed(2)}`;
+        }
+        
+        async function saveAppointmentEdit() {
+            const checkboxes = document.querySelectorAll('#edit-appt-services input[type="checkbox"]:checked');
+            
+            if (checkboxes.length === 0) {
+                alert('At least one service is required.');
+                return;
+            }
+            
+            const newServices = Array.from(checkboxes).map(cb => cb.value);
+            const newDate = document.getElementById('edit-appt-date').value;
+            const newTime = document.getElementById('edit-appt-time').value;
+            const email = document.getElementById('edit-appt-email').value;
+            const priceText = document.getElementById('edit-appt-price').textContent;
+            const newPrice = parseFloat(priceText.replace('$', '')) || 0;
+            
+            if (!newDate || !newTime) {
+                alert('Please select a date and time.');
+                return;
+            }
+            
+            const btn = document.querySelector('#edit-appt-modal .btn-primary');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;display:inline-block;"></div> Saving...';
+            
+            try {
+                const response = await callAppsScript('updateAppointment', {
+                    email: email,
+                    oldTime: editApptState.originalTime,
+                    newDate: newDate,
+                    newTime: newTime,
+                    newServices: newServices,
+                    newPrice: newPrice
+                });
+                
+                if (response.error) {
+                    alert(response.error);
+                } else {
+                    closeEditApptModal();
+                    // Reload the appointments for the current date
+                    const dateInput = document.getElementById('bookings-date');
+                    if (dateInput) loadAppointmentsForDate(dateInput.value);
+                }
+            } catch (e) {
+                alert('Error saving: ' + e.message);
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = 'Save Changes';
+        }
+        
+        async function cancelAppointment() {
+            if (!confirm('Are you sure you want to cancel this appointment? This will mark it as cancelled and remove the calendar event.')) return;
+            
+            const email = document.getElementById('edit-appt-email').value;
+            
+            try {
+                const response = await callAppsScript('cancelAppointment', {
+                    email: email,
+                    oldTime: editApptState.originalTime
+                });
+                
+                if (response.error) {
+                    alert(response.error);
+                } else {
+                    closeEditApptModal();
+                    const dateInput = document.getElementById('bookings-date');
+                    if (dateInput) loadAppointmentsForDate(dateInput.value);
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        // ============================================
         // CUSTOMER BOOKING FLOW
         // ============================================
         async function checkEmail() {
@@ -1898,6 +2103,61 @@
                     if (addonPriceEl) addonPriceEl.classList.add('hidden');
                 }
             });
+        }
+
+        async function addCreditingCustomer() {
+            const email = document.getElementById('crediting-customer-email').value.trim();
+            if (!email) { alert("Please enter an email."); return; }
+            
+            // Check if already in the checkout emails
+            const existingEmails = [...new Set(state.checkoutSelected.map(id => {
+                const a = state.checkoutAppointments.find(appt => appt.id === id);
+                return a ? a.email : null;
+            }).filter(e => e))];
+            
+            if (!state.creditingCustomers) state.creditingCustomers = [];
+            
+            // Don't add duplicates
+            if (existingEmails.includes(email.toLowerCase()) || state.creditingCustomers.includes(email.toLowerCase())) {
+                alert("This customer's credits are already loaded.");
+                return;
+            }
+            
+            // Fetch their credits
+            try {
+                const response = await callAppsScript('getCheckoutData', { emails: [email] });
+                const newCredits = response.credits || [];
+                const newGCs = response.giftCards || [];
+                
+                if (newCredits.length === 0 && newGCs.length === 0) {
+                    alert("No available credits or gift cards found for this email.");
+                    return;
+                }
+                
+                // Add to state
+                state.creditingCustomers.push(email.toLowerCase());
+                state.checkoutAvailableCredits = [...state.checkoutAvailableCredits, ...newCredits];
+                state.checkoutAvailableGCs = [...state.checkoutAvailableGCs, ...newGCs];
+                
+                // Show in UI
+                const container = document.getElementById('crediting-customer-list');
+                container.innerHTML += `
+                    <div class="flex items-center justify-between bg-white p-2 rounded border border-purple-200 text-sm">
+                        <span class="font-medium">${email}</span>
+                        <span class="text-purple-600">${newCredits.length} credit(s), ${newGCs.length} GC(s)</span>
+                    </div>
+                `;
+                
+                // Re-render the credit dropdowns and GC inputs
+                updateCreditDropdowns();
+                renderGiftCardInputs();
+                recalcCheckoutTotal();
+                
+                document.getElementById('crediting-customer-email').value = '';
+                
+            } catch (e) {
+                alert("Error fetching credits: " + e.message);
+            }
         }
         
         function updateOrderSummary() {
@@ -2430,9 +2690,6 @@
                     case 'bookings': 
                         if (typeof loadTodaysBookings === 'function') loadTodaysBookings(); 
                         break;
-                    case 'tomorrow': 
-                        if (typeof loadTomorrowsBookings === 'function') loadTomorrowsBookings(); 
-                        break;
                     case 'credits': 
                         if (typeof loadCreditManagement === 'function') loadCreditManagement(); 
                         break;
@@ -2619,6 +2876,9 @@
                     <td class="px-6 py-4">
                         <button onclick="editCustomer('${customer.id}')" class="text-blue-600 hover:text-blue-800 text-sm font-semibold">Edit</button>
                     </td>
+                    <td class="px-6 py-4">
+                        <button onclick="startBookingForEmail('${customer.email}')" class="text-green-600 hover:text-green-800 text-sm font-semibold">Book</button>
+                    </td>
                 </tr>
             `}).join('');
             
@@ -2698,6 +2958,86 @@
             openCustomerModal(customerId);
         }
 
+        // Start booking flow for a specific email (used from customer list Book button and Save & Book)
+        async function startBookingForEmail(email) {
+            // Switch to customer booking view
+            document.getElementById('business-portal').classList.add('hidden');
+            document.getElementById('customer-booking').classList.remove('hidden');
+            
+            // Reset booking state
+            resetBookingState();
+            
+            // Set the email and proceed as if they clicked "Book Now"
+            state.customerEmail = email;
+            
+            // Show loading
+            const btn = document.querySelector('#booking-step-1 .btn-primary');
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.innerHTML = '<div class="spinner"></div> Loading...';
+                btn.disabled = true;
+            }
+            
+            try {
+                const response = await callAppsScript('checkCustomer', { email });
+                if (response.exists) {
+                    state.existingCustomer = response.customer;
+                    document.getElementById('welcome-name').textContent = response.customer.fullName;
+                    document.getElementById('customer-name-display').classList.remove('hidden');
+                    state.credits = response.credits || [];
+                    state.giftCards = response.giftCards || [];
+                }
+            } catch (error) {
+                console.error("Backend Connection Failed:", error);
+            }
+            
+            if (btn) {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+            
+            // Go to step 2 (service selection)
+            state.currentStep = 2;
+            updateStepIndicators();
+            showCurrentStep();
+            loadServices();
+        }
+        
+        // Save customer data from modal, then start booking with their email
+        async function saveAndBook() {
+            const customerData = {
+                id: document.getElementById('edit-customer-id').value || '',
+                fullName: document.getElementById('edit-fullName').value,
+                email: document.getElementById('edit-email').value,
+                phone: document.getElementById('edit-phone').value,
+                dob: document.getElementById('edit-dob').value,
+                sex: document.getElementById('edit-sex').value,
+                height: document.getElementById('edit-height').value,
+                weight: document.getElementById('edit-weight').value,
+                ethnicity: document.getElementById('edit-ethnicity').value,
+                notes: document.getElementById('edit-notes').value
+            };
+        
+            if (!customerData.fullName || !customerData.email) {
+                alert("Please fill in at least Full Name and Email.");
+                return;
+            }
+        
+            try {
+                const response = await callAppsScript('saveCustomer', customerData);
+                if (response.error) {
+                    alert(response.error);
+                    return;
+                }
+                closeCustomerModal();
+                // Now start booking for this email
+                startBookingForEmail(customerData.email);
+            } catch (error) {
+                console.error(error);
+                alert("Error saving customer.");
+            }
+        }
+
         function closeCustomerModal() {
             document.getElementById('customer-modal').classList.add('hidden');
         }
@@ -2732,19 +3072,26 @@
             }
         }
 
-        async function loadTodaysBookings() {
+        function loadAppointmentsSection() {
             const today = new Date();
-            document.getElementById('today-date-display').textContent = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            const dateInput = document.getElementById('bookings-date');
+            dateInput.value = today.toISOString().split('T')[0];
+            loadAppointmentsForDate(dateInput.value);
+        }
+        
+        async function loadAppointmentsForDate(dateStr) {
+            const date = new Date(dateStr + 'T00:00:00');
+            document.getElementById('bookings-date-display').textContent = date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             
-            const container = document.getElementById('today-bookings-list');
+            const container = document.getElementById('bookings-list');
             container.innerHTML = '<div class="spinner"></div>';
         
             try {
-                const response = await callAppsScript('getDailyAgenda', { date: today.toISOString() });
+                const response = await callAppsScript('getDailyAgenda', { date: date.toISOString() });
                 const agenda = response.agenda || [];
                 
                 if (agenda.length === 0) {
-                    container.innerHTML = '<p class="text-gray-500">No bookings found.</p>';
+                    container.innerHTML = '<p class="text-gray-500">No appointments found for this date.</p>';
                     return;
                 }
         
@@ -2758,13 +3105,16 @@
                         if (!isNaN(dobDate.getTime())) dobStr = `${String(dobDate.getMonth()+1).padStart(2,'0')}/${String(dobDate.getDate()).padStart(2,'0')}/${dobDate.getFullYear()}`;
                     }
         
-                    let statusColor = 'bg-yellow-100 text-yellow-700'; // Scheduled
+                    let statusColor = 'bg-yellow-100 text-yellow-700';
                     if (b.customer.apptStatus === 'Completed') statusColor = 'bg-green-100 text-green-700';
                     else if (b.customer.apptStatus === 'Confirmed' || b.customer.apptStatus === 'Accepted') statusColor = 'bg-blue-100 text-blue-700';
                     
                     const guestColor = b.customer.guestStatus === 'Accepted' ? 'bg-green-50 text-green-600' : 
                                        b.customer.guestStatus === 'Declined' ? 'bg-red-50 text-red-600' : 
                                        b.customer.guestStatus === 'Maybe' ? 'bg-orange-50 text-orange-600' : 'bg-gray-50 text-gray-500';
+        
+                    // Encode data for edit button - use the calEventId from the agenda
+                    const editDataAttr = b.calEventId ? `data-cal-event-id="${b.calEventId}"` : '';
         
                     return `
                     <div class="glass-card rounded-2xl p-6">
@@ -2785,94 +3135,14 @@
                             </div>
                         </div>
                         
-                        <button onclick="toggleNoteExpand(this)" class="text-xs text-blue-500 mb-2 hover:underline focus:outline-none">
-                            Show Details
-                        </button>
-                        
-                        <div class="notes-content hidden grid md:grid-cols-4 gap-4 text-sm mb-2">
-                            <div><span class="text-gray-500">Phone:</span> <span class="font-medium">${b.customer.phone || '-'}</span></div>
-                            <div><span class="text-gray-500">Sex:</span> <span class="font-medium">${details.sex || '-'}</span></div>
-                            <div><span class="text-gray-500">DOB:</span> <span class="font-medium">${dobStr}</span></div>
-                            <div><span class="text-gray-500">Height:</span> <span class="font-medium">${details.height || '-'}</span></div>
-                            <div><span class="text-gray-500">Weight:</span> <span class="font-medium">${details.weight || '-'}</span></div>
-                            <div><span class="text-gray-500">Ethnicity:</span> <span class="font-medium">${details.ethnicity || '-'}</span></div>
+                        <div class="flex gap-2 mb-2">
+                            <button onclick="toggleNoteExpand(this)" class="text-xs text-blue-500 hover:underline focus:outline-none">
+                                Show Details
+                            </button>
+                            <button onclick="openEditAppointmentModal('${b.customer.email}', '${encodeURIComponent(b.customer.services)}', '${encodeURIComponent(b.title)}', '${new Date(b.time).toISOString()}')" class="text-xs text-orange-500 hover:underline focus:outline-none">
+                                ✏️ Edit
+                            </button>
                         </div>
-                        
-                        <div class="border-t border-gray-100 pt-2 mt-2 text-sm">
-                            <div class="flex gap-6 mb-1">
-                                <div class="flex-1"><span class="text-gray-500 font-semibold">Services:</span> <span class="text-blue-700 font-medium">${b.customer.services}</span></div>
-                            </div>
-                            <div class="flex gap-6">
-                                <div class="flex-1"><span class="text-gray-500 font-semibold">Cust. Notes:</span> <span class="text-gray-700">${details.notes || '-'}</span></div>
-                                <div class="flex-1"><span class="text-gray-500 font-semibold">Appt. Notes:</span> <span class="text-red-600">${b.customer.apptNote || 'None'}</span></div>
-                            </div>
-                        </div>
-                    </div>
-                `}).join('');
-        
-            } catch (e) {
-                console.error(e);
-                container.innerHTML = '<p class="text-red-500">Error loading bookings.</p>';
-            }
-        }
-        
-        async function loadTomorrowsBookings() {
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            document.getElementById('tomorrow-date-display').textContent = tomorrow.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            
-            const container = document.getElementById('tomorrow-bookings-list');
-            container.innerHTML = '<div class="spinner"></div>';
-        
-            try {
-                const response = await callAppsScript('getDailyAgenda', { date: tomorrow.toISOString() });
-                const agenda = response.agenda || [];
-                
-                if (agenda.length === 0) {
-                    container.innerHTML = '<p class="text-gray-500">No bookings found.</p>';
-                    return;
-                }
-        
-                container.innerHTML = agenda.map(b => {
-                    const timeStr = new Date(b.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                    const details = b.customer.details || {};
-                    
-                    let dobStr = '-';
-                    if (details.dob) {
-                        const dobDate = new Date(details.dob);
-                        if (!isNaN(dobDate.getTime())) dobStr = `${String(dobDate.getMonth()+1).padStart(2,'0')}/${String(dobDate.getDate()).padStart(2,'0')}/${dobDate.getFullYear()}`;
-                    }
-        
-                    let statusColor = 'bg-yellow-100 text-yellow-700'; // Scheduled
-                    if (b.customer.apptStatus === 'Completed') statusColor = 'bg-green-100 text-green-700';
-                    else if (b.customer.apptStatus === 'Confirmed' || b.customer.apptStatus === 'Accepted') statusColor = 'bg-blue-100 text-blue-700';
-                    
-                    const guestColor = b.customer.guestStatus === 'Accepted' ? 'bg-green-50 text-green-600' : 
-                                       b.customer.guestStatus === 'Declined' ? 'bg-red-50 text-red-600' : 
-                                       b.customer.guestStatus === 'Maybe' ? 'bg-orange-50 text-orange-600' : 'bg-gray-50 text-gray-500';
-        
-                    return `
-                    <div class="glass-card rounded-2xl p-6">
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center font-bold text-green-600">${b.customer.name.split(' ').map(n=>n[0]).join('')}</div>
-                                <div>
-                                    <h3 class="font-bold">${b.customer.name}</h3>
-                                    <p class="text-gray-500 text-sm">${b.customer.email}</p>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <p class="font-bold text-green-500">${timeStr}</p>
-                                <div class="flex gap-1 justify-end mt-1">
-                                    <span class="text-xs px-2 py-0.5 rounded-full ${statusColor}">${b.customer.apptStatus}</span>
-                                    <span class="text-xs px-2 py-0.5 rounded-full ${guestColor}">${b.customer.guestStatus}</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <button onclick="toggleNoteExpand(this)" class="text-xs text-green-500 mb-2 hover:underline focus:outline-none">
-                            Show Details
-                        </button>
                         
                         <div class="notes-content hidden grid md:grid-cols-4 gap-4 text-sm mb-2">
                             <div><span class="text-gray-500">Phone:</span> <span class="font-medium">${b.customer.phone || '-'}</span></div>
@@ -3391,6 +3661,9 @@
         }
         
         async function openCheckoutModal(payer) {
+            state.creditingCustomers = [];
+            document.getElementById('crediting-customer-list').innerHTML = '';
+            document.getElementById('crediting-customer-email').value = '';
             document.getElementById('payer-modal').classList.add('hidden');
             
             // 1. Setup State
@@ -4351,7 +4624,7 @@ async function callAppsScript(action, data = {}) {
         'adjustCredit', 'getAppointments', 'getDailyAgenda', 'getCheckoutData', 
         'deductCreditsAndGC', 'acceptCash', 'createCheckoutSession',
         'saveService', 'deleteService', 'getQuestionsList', 'saveQuestion', 
-        'deleteQuestion', 'getBookings'
+        'deleteQuestion', 'getBookings', 'updateAppointment', 'cancelAppointment'
     ];
 
     // SECURITY FIX: Handle Password Injection
@@ -4421,6 +4694,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
