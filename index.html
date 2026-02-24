@@ -4295,6 +4295,7 @@
                     notes: document.getElementById('checkout-notes-input').value,
                     parties: [...new Set(state.checkoutServicesFlat.map(s => s.customerName))],
                     savings: state.checkoutSavings,
+                    appliedDiscount: state.checkoutDiscount || null,
                     manualOverride: state.checkoutManualOverride ? true : false,
                     servicesList: state.checkoutServicesFlat.map(s => ({ name: s.name, customer: s.customerName })),
                     appointmentIds: state.checkoutSelected // Pass IDs to mark Completed
@@ -4326,6 +4327,8 @@
                 services: state.checkoutServicesFlat.map(s => s.name),
                 total: state.checkoutFinalTotal,
                 notes: document.getElementById('checkout-notes-input').value,
+                appliedDiscount: state.checkoutDiscount || null,
+                payerEmail: state.checkoutPayer.email,
                 appointmentIds: state.checkoutSelected
             };
             
@@ -4746,6 +4749,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
