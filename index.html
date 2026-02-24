@@ -1498,7 +1498,7 @@
         ];
         
         const HARDCODED_QUESTIONS = [
-            { id: '5', type: 'short text', required: false, text: 'List any join replacements (optional)', ask: 'every time' },
+            { id: '5', type: 'short text', required: false, text: 'Briefly list any joint replacements (optional)', ask: 'every time' },
             { id: '6', type: 'checkbox', required: false, text: 'Check if you have hearing aids (optional)', ask: 'every time' },
             { id: '1', type: 'checkbox', required: true, text: 'I am not pregnant, do not suspect I may be pregnant, and am not attempting to become pregnant. My weight does not exceed 350 pounds. I have not been administered gastrointestinal contrast or radionuclide agents within the previous 7 days.', ask: 'every time' },
             { id: '2', type: 'checkbox', required: true, text: 'I have read the [waiver and consent form](https://dexafitkc.com/documents) and do consent to participate in the services rendered by QFit LLC dba DexaFit KC and/or DexaFit, LLC.', ask: 'every time' },
@@ -2941,6 +2941,8 @@
                     // Show history section
                     document.getElementById('customer-history').classList.remove('hidden');
                     document.getElementById('customer-appointments').innerHTML = `<div class="text-sm text-gray-500">Loading history...</div>`;
+                    // Fetch and render appointment history
+                    loadCustomerHistory(customer.id);
                 } else {
                     console.error("Customer not found in state with ID: " + customerId);
                     alert("Error: Could not find customer data.");
@@ -2956,6 +2958,51 @@
 
         function editCustomer(customerId) {
             openCustomerModal(customerId);
+        }
+
+        async function loadCustomerHistory(customerId) {
+            const container = document.getElementById('customer-appointments');
+            
+            try {
+                const response = await callAppsScript('getCustomerHistory', { customerId: customerId });
+                const history = response.history || [];
+                
+                if (history.length === 0) {
+                    container.innerHTML = '<div class="text-sm text-gray-500">No appointment history found.</div>';
+                    return;
+                }
+                
+                container.innerHTML = history.map(h => {
+                    let statusColor = 'bg-gray-100 text-gray-600';
+                    if (h.status === 'Completed') statusColor = 'bg-green-100 text-green-700';
+                    else if (h.status === 'Scheduled' || h.status === 'Confirmed') statusColor = 'bg-blue-100 text-blue-700';
+                    else if (h.status === 'CustCancel') statusColor = 'bg-red-100 text-red-700';
+                    
+                    let timeDisplay = h.time || '';
+                    if (timeDisplay instanceof Date) {
+                        timeDisplay = timeDisplay.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                    }
+                    
+                    return `
+                        <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-100 text-sm">
+                            <div class="flex-1">
+                                <span class="font-semibold text-gray-800">${h.date}</span>
+                                <span class="text-gray-400 mx-1">·</span>
+                                <span class="text-gray-500">${timeDisplay}</span>
+                            </div>
+                            <div class="flex-1 text-center text-gray-700">${h.services}</div>
+                            <div class="flex items-center gap-2">
+                                <span class="font-semibold">$${parseFloat(h.price || 0).toFixed(2)}</span>
+                                <span class="text-xs px-2 py-0.5 rounded-full ${statusColor}">${h.status}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (e) {
+                console.error('Error loading history:', e);
+                container.innerHTML = '<div class="text-sm text-red-500">Error loading history.</div>';
+            }
         }
 
         // Start booking flow for a specific email (used from customer list Book button and Save & Book)
@@ -3142,6 +3189,7 @@
                             <button onclick="openEditAppointmentModal('${b.customer.email}', '${encodeURIComponent(b.customer.services)}', '${encodeURIComponent(b.title)}', '${new Date(b.time).toISOString()}')" class="text-xs text-orange-500 hover:underline focus:outline-none">
                                 ✏️ Edit
                             </button>
+                            ${b.customer.poUrl ? `<a href="${b.customer.poUrl}" target="_blank" class="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold hover:bg-indigo-200 no-underline">PO</a>` : ''}
                         </div>
                         
                         <div class="notes-content hidden grid md:grid-cols-4 gap-4 text-sm mb-2">
@@ -4628,7 +4676,7 @@ async function callAppsScript(action, data = {}) {
         'adjustCredit', 'getAppointments', 'getDailyAgenda', 'getCheckoutData', 
         'deductCreditsAndGC', 'acceptCash', 'createCheckoutSession',
         'saveService', 'deleteService', 'getQuestionsList', 'saveQuestion', 
-        'deleteQuestion', 'getBookings', 'updateAppointment', 'cancelAppointment'
+        'deleteQuestion', 'getBookings', 'updateAppointment', 'cancelAppointment', 'getCustomerHistory'
     ];
 
     // SECURITY FIX: Handle Password Injection
@@ -4698,6 +4746,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
