@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Generating Physician Order...</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; background: #f8f9fa;
+  }
+  .status {
+    text-align: center; padding: 3rem;
+    background: #fff; border-radius: 12px;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+    max-width: 420px; width: 90%;
+  }
+  .spinner {
+    width: 48px; height: 48px; border: 4px solid #e0e0e0;
+    border-top-color: #1a73e8; border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 1.5rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  h2 { color: #202124; margin-bottom: 0.5rem; font-size: 1.25rem; }
+  p { color: #5f6368; font-size: 0.95rem; }
+  .error { color: #d93025; }
+  .error h2 { color: #d93025; }
+</style>
+</head>
+<body>
+<div class="status" id="status">
+  <div class="spinner" id="spinner"></div>
+  <h2 id="title">Generating your order...</h2>
+  <p id="message">Your PDF is being prepared for download.</p>
+</div>
+
+<script>
+(async function() {
+  const { jsPDF } = window.jspdf;
+
+  // ── Parse URL Parameters ───────────────────────────────────────────
+  const params = new URLSearchParams(window.location.search);
+  const get = (key) => decodeURIComponent(params.get(key) || '').trim();
+
+  const data = {
+    date:        get('date'),
+    phname:      get('phname'),
+    ksmed:       get('ksmed'),
+    npi:         get('npi'),
+    address:     get('address'),
+    contact:     get('contact'),
+    spodate:     get('spodate'),
+    sig:         get('sig'),
+    name:        get('name'),
+    dob:         get('dob'),
+    sex:         get('sex'),
+    height:      get('height'),
+    weight:      get('weight'),
+    joints:      get('joints'),
+    hearing:     get('hearing'),
+    nonpregnant: get('nonpregnant'),
+    nogi:        get('nogi'),
+    under350:    get('under350'),
+    successUrl:  get('successUrl') || '',
+  };
+
+  const isTruthy = (v) => v && ['true','1','yes','on','x'].includes(v.toLowerCase());
+  const cleanJoints = (text) => text.replace(/\s+/g, ' ').trim();
+
+  function loadImage(url) {
+    return new Promise((resolve) => {
+      if (!url) return resolve(null);
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  }
+
+  try {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+    const W = 612, H = 792;
+    const LM = 54;
+    const RM = W - 54;
+    const CW = RM - LM;
+
+    const BLACK = [0, 0, 0];
+    const GRAY  = [100, 100, 100];
+    const LTGRAY = [180, 180, 180];
+
+    let y = 50;
+
+    // ── TITLE ─────────────────────────────────────────────────────
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(...BLACK);
+    doc.text('PHYSICIAN ORDER FOR BODY COMPOSITION SCAN', W / 2, y, { align: 'center' });
+
+    y += 15;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...GRAY);
+    doc.text('QFit LLC dba DexaFit KC | 14008 West 135th Street, Olathe, KS | 913-444-3141', W / 2, y, { align: 'center' });
+
+    y += 12;
+    doc.setDrawColor(...LTGRAY);
+    doc.setLineWidth(0.5);
+    doc.line(LM, y, RM, y);
+
+    // ── ORDER DATE ────────────────────────────────────────────────
+    y += 18;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...BLACK);
+    doc.text('Order Date:', LM, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(data.date, LM + 65, y);
+    doc.setDrawColor(...LTGRAY);
+    doc.line(LM + 62, y + 2, LM + 200, y + 2);
+
+    // ── Section header helper ─────────────────────────────────────
+    function sectionHeader(title) {
+      y += 22;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(...BLACK);
+      doc.text(title, LM, y);
+      y += 3;
+      doc.setDrawColor(...BLACK);
+      doc.setLineWidth(0.75);
+      doc.line(LM, y, RM, y);
+      y += 4;
+    }
+
+    // ── Label + value helper ──────────────────────────────────────
+    function labelValue(x, yPos, label, value, labelW, lineW) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(...GRAY);
+      doc.text(label, x, yPos);
+      doc.setTextColor(...BLACK);
+      doc.text(value || '', x + labelW, yPos);
+      doc.setDrawColor(...LTGRAY);
+      doc.setLineWidth(0.3);
+      doc.line(x + labelW - 2, yPos + 2, x + labelW + lineW, yPos + 2);
+    }
+
+    // ── Checkbox helper: box with bold X when checked ─────────────
+    function drawCheckbox(x, yPos, checked, label) {
+      const sz = 10;
+      const top = yPos - sz + 2;
+
+      // Draw the box
+      doc.setDrawColor(...BLACK);
+      doc.setFillColor(255, 255, 255);
+      doc.setLineWidth(0.75);
+      doc.rect(x, top, sz, sz);
+
+      // Draw bold X if checked
+      if (checked) {
+        doc.setDrawColor(...BLACK);
+        doc.setLineWidth(2.0);
+        const p = 2; // padding inside box
+        doc.line(x + p, top + p, x + sz - p, top + sz - p);
+        doc.line(x + sz - p, top + p, x + p, top + sz - p);
+        doc.setLineWidth(0.75);
+      }
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(...BLACK);
+      doc.text(label, x + sz + 5, yPos);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // REFERRING PHYSICIAN INFORMATION
+    // ══════════════════════════════════════════════════════════════
+    sectionHeader('REFERRING PHYSICIAN INFORMATION');
+
+    y += 14;
+    labelValue(LM, y, 'Full Legal Name:', data.phname, 82, 140);
+    labelValue(295, y, 'Kansas Medical License #:', data.ksmed, 125, 70);
+    labelValue(500, y, 'NPI:', data.npi, 24, 40);
+
+    y += 18;
+    labelValue(LM, y, 'Practice Address:', data.address, 85, 180);
+    labelValue(340, y, 'Contact Information:', data.contact, 100, 115);
+
+    // Standing order italic line
+    y += 22;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...GRAY);
+    const spoText = '"Patient meets eligibility criteria under Standing Order dated ';
+    doc.text(spoText, LM, y);
+    const spoW = doc.getTextWidth(spoText);
+    doc.setFont('helvetica', 'bolditalic');
+    doc.setTextColor(...BLACK);
+    doc.text(data.spodate, LM + spoW, y);
+    const dateW = doc.getTextWidth(data.spodate);
+    doc.setDrawColor(...LTGRAY);
+    doc.line(LM + spoW - 1, y + 2, LM + spoW + dateW + 2, y + 2);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(...GRAY);
+    doc.text(' with the physician above."', LM + spoW + dateW, y);
+
+    // Physician Signature
+    y += 22;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...BLACK);
+    doc.text('Physician Signature:', LM, y);
+    doc.setDrawColor(...BLACK);
+    doc.setLineWidth(0.5);
+    doc.line(LM + 100, y + 2, LM + 310, y + 2);
+
+    const sigData = await loadImage(data.sig);
+    if (sigData) {
+      doc.addImage(sigData, 'PNG', LM + 105, y - 26, 130, 30);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // AUTHORIZED SERVICE
+    // ══════════════════════════════════════════════════════════════
+    sectionHeader('AUTHORIZED SERVICE');
+
+    y += 14;
+    const svcItems = [
+      ['Service:', 'Total Body Dual-energy X-ray Absorptiometry (DEXA) Scan'],
+      ['CPT Code:', '76499 TC'],
+      ['Clinical Indication:', 'Wellness measurement of regional, visceral, and whole body fat, lean and bone mass.'],
+      ['ICD-10:', 'Z13.89, E65, M62.89, Z13.82'],
+    ];
+    for (const [label, value] of svcItems) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...GRAY);
+      doc.text(label, LM, y);
+      const lw = doc.getTextWidth(label);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...BLACK);
+      const valLines = doc.splitTextToSize(value, CW - lw - 8);
+      doc.text(valLines, LM + lw + 6, y);
+      y += valLines.length * 11 + 3;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // PATIENT INFORMATION
+    // ══════════════════════════════════════════════════════════════
+    sectionHeader('PATIENT INFORMATION');
+
+    y += 14;
+    labelValue(LM, y, 'Full Name:', data.name, 54, 165);
+    labelValue(290, y, 'Date of Birth:', data.dob, 72, 70);
+    labelValue(450, y, 'Sex:', data.sex, 24, 50);
+
+    y += 18;
+    labelValue(LM, y, 'Height:', data.height, 40, 60);
+    labelValue(165, y, 'Weight:', data.weight, 42, 60);
+    const jointsClean = cleanJoints(data.joints);
+    // Joints field: label then wrapped text below the underline if needed
+    const jointsLabelX = 290;
+    const jointsLabelW = 145;
+    const jointsLineW = 120;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...GRAY);
+    doc.text('Joint Replacements (describe):', jointsLabelX, y);
+    doc.setDrawColor(...LTGRAY);
+    doc.setLineWidth(0.3);
+    doc.line(jointsLabelX + jointsLabelW - 2, y + 2, jointsLabelX + jointsLabelW + jointsLineW, y + 2);
+
+    // Wrap the joints text into the available width
+    const jointsMaxW = jointsLineW + 2;
+    doc.setTextColor(...BLACK);
+    if (jointsClean) {
+      const jointLines = doc.splitTextToSize(jointsClean, jointsMaxW);
+      doc.text(jointLines[0], jointsLabelX + jointsLabelW, y);
+      // Additional lines go below, with continuation underlines
+      for (let i = 1; i < jointLines.length; i++) {
+        y += 12;
+        doc.setTextColor(...BLACK);
+        doc.text(jointLines[i], jointsLabelX + jointsLabelW, y);
+        doc.setDrawColor(...LTGRAY);
+        doc.line(jointsLabelX + jointsLabelW - 2, y + 2, jointsLabelX + jointsLabelW + jointsLineW, y + 2);
+      }
+    }
+
+    // Hearing Aids
+    y += 18;
+    drawCheckbox(LM, y, isTruthy(data.hearing), 'Hearing Aids');
+
+    // ══════════════════════════════════════════════════════════════
+    // PATIENT ELIGIBILITY REQUIREMENTS
+    // ══════════════════════════════════════════════════════════════
+    sectionHeader('PATIENT ELIGIBILITY REQUIREMENTS');
+
+    y += 16;
+    drawCheckbox(LM, y, isTruthy(data.nonpregnant), 'Non-Pregnant');
+    drawCheckbox(LM + 120, y, isTruthy(data.nogi), 'No gastrointestinal contrast or radionuclides in the past 7 days');
+    y += 16;
+    drawCheckbox(LM, y, isTruthy(data.under350), 'Under 350 lbs.');
+
+    // ══════════════════════════════════════════════════════════════
+    // PRE-EXAM REQUIREMENTS
+    // ══════════════════════════════════════════════════════════════
+    sectionHeader('PRE-EXAM REQUIREMENTS (PATIENT INSTRUCTIONS)');
+
+    y += 14;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...BLACK);
+    const preExam = [
+      'No exercise prior to visit (same day)',
+      'Do not visit dehydrated or overhydrated',
+      'Fast for two hours prior to visit',
+      'Do not wear metal clothing or accessories',
+    ];
+    for (const item of preExam) {
+      doc.text('\u2022   ' + item, LM + 8, y);
+      y += 13;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // EXAM CONTRAINDICATIONS
+    // ══════════════════════════════════════════════════════════════
+    y += 2;
+    sectionHeader('EXAM CONTRAINDICATIONS');
+
+    y += 14;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...BLACK);
+    const contra = [
+      'Pregnancy or suspected pregnancy',
+      'Gastrointestinal contrast agents or radionuclides administered within the past 7 days',
+      'Body weight exceeding 350 lbs. (equipment weight limit)',
+    ];
+    for (const item of contra) {
+      doc.text('\u2022   ' + item, LM + 8, y);
+      y += 13;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // FOOTER
+    // ══════════════════════════════════════════════════════════════
+    y += 10;
+    doc.setDrawColor(...LTGRAY);
+    doc.setLineWidth(0.5);
+    doc.line(LM, y, RM, y);
+    y += 14;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...GRAY);
+    doc.text('This order is valid for the patient named above for a single DEXA scan session at DexaFit KC.', W / 2, y, { align: 'center' });
+
+    // ══════════════════════════════════════════════════════════════
+    // DOWNLOAD & REDIRECT
+    // ══════════════════════════════════════════════════════════════
+    const safeName = (data.name || 'patient').replace(/[^a-zA-Z0-9]/g, '_');
+    const safeDate = (data.date || 'undated').replace(/[^a-zA-Z0-9]/g, '-');
+    doc.save(`PhysicianOrder_${safeName}_${safeDate}.pdf`);
+
+    document.getElementById('spinner').style.display = 'none';
+    document.getElementById('title').textContent = 'Order found!';
+    document.getElementById('message').textContent = 'Your PDF has been downloaded. Redirecting...';
+
+    if (data.successUrl) {
+      setTimeout(() => { window.location.href = data.successUrl; }, 1500);
+    } else {
+      document.getElementById('message').textContent = 'Your PDF has been downloaded.';
+    }
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById('spinner').style.display = 'none';
+    document.getElementById('status').classList.add('error');
+    document.getElementById('title').textContent = 'Something went wrong';
+    document.getElementById('message').textContent = 'Error: ' + err.message;
+  }
+})();
+</script>
+</body>
+</html>
