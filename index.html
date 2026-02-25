@@ -4508,9 +4508,14 @@
         function prepareDeductionData() {
             const data = { credits: [], giftCards: [] };
             
-            // Credits
-            const usedCreditIds = new Set(Object.values(state.checkoutCreditsUsed));
-            usedCreditIds.forEach(id => data.credits.push({ id: id, amount: 1 }));
+            // Credits — count how many times each credit ID was used across services
+            const creditUsageCounts = {};
+            Object.values(state.checkoutCreditsUsed).forEach(id => {
+                creditUsageCounts[id] = (creditUsageCounts[id] || 0) + 1;
+            });
+            Object.entries(creditUsageCounts).forEach(([id, count]) => {
+                data.credits.push({ id: id, amount: count });
+            });
         
             // GCs
             const gcByPerson = {};
@@ -4906,6 +4911,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
