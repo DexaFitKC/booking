@@ -1494,10 +1494,19 @@
                 <div id="pos-status-icon" class="mb-6">
                     <div class="spinner mx-auto" style="width:48px;height:48px;border-width:4px;"></div>
                 </div>
-                <h2 id="pos-status-title" class="text-2xl font-bold mb-2">Waiting for Card…</h2>
-                <p id="pos-status-message" class="text-gray-500 mb-6">Please tap, insert, or swipe the card on the terminal reader.</p>
+                <h2 id="pos-status-title" class="text-2xl font-bold mb-2">Terminal Ready</h2>
+                <p id="pos-status-message" class="text-gray-500 mb-6">
+                    Customer may tap, insert, or swipe their card on the reader.
+                </p>
                 <div id="pos-amount-display" class="text-3xl font-black text-blue-600 mb-6"></div>
-                <button id="pos-cancel-btn" onclick="cancelTerminalPayment()" class="btn-secondary w-full py-3 rounded-xl font-semibold border-red-300 text-red-600 hover:bg-red-50">Cancel Payment</button>
+                <div id="pos-success-actions" class="hidden">
+                    <button onclick="closePosModal(true)" class="btn-primary w-full py-3 rounded-xl font-semibold">Done</button>
+                </div>
+                <div id="pos-waiting-actions">
+                    <button onclick="cancelTerminalPayment()" class="btn-secondary w-full py-3 rounded-xl font-semibold border-red-300 text-red-600 hover:bg-red-50">
+                        Cancel Transaction
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -4371,20 +4380,18 @@
                 // POS TERMINAL PAYMENT
                 // ============================================
                 let posPollingInterval = null;
-        
+
                 async function acceptTerminalPayment() {
                     const btn = document.getElementById('accept-pos-btn');
                     const originalBtnHtml = btn.innerHTML;
                     btn.disabled = true;
                     btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;display:inline-block;"></div> Initiating…';
         
-                    // 1. Deduct credits & gift cards (same as other flows)
                     const deductionData = prepareDeductionData();
         
                     try {
                         await callAppsScript('deductCreditsAndGC', deductionData);
         
-                        // 2. Build payload (mirrors acceptPayment / acceptCash)
                         const terminalData = {
                             payerEmail: state.checkoutPayer.email,
                             payerName: state.checkoutPayer.name,
@@ -4398,27 +4405,18 @@
                             appointmentIds: state.checkoutSelected
                         };
         
-                        // 3. Create PaymentIntent and hand off to reader
                         const response = await callAppsScript('createTerminalPayment', terminalData);
         
                         if (response.error) {
                             throw new Error(response.error);
                         }
         
-                        // 4. Show polling modal
+                        // Show the polling modal in "waiting" state
                         state.posPaymentIntentId = response.paymentIntentId;
                         document.getElementById('pos-amount-display').textContent = '$' + parseFloat(state.checkoutFinalTotal).toFixed(2);
-                        
-                        // Reset modal to "waiting" state
-                        document.getElementById('pos-status-icon').innerHTML = '<div class="spinner mx-auto" style="width:48px;height:48px;border-width:4px;"></div>';
-                        document.getElementById('pos-status-title').textContent = 'Waiting for Card…';
-                        document.getElementById('pos-status-message').textContent = 'Please tap, insert, or swipe the card on the terminal reader.';
-                        document.getElementById('pos-cancel-btn').textContent = 'Cancel Payment';
-                        document.getElementById('pos-cancel-btn').onclick = cancelTerminalPayment;
-                        
+                        resetPosModal();
                         document.getElementById('pos-status-modal').classList.remove('hidden');
         
-                        // 5. Start polling for payment status
                         pollTerminalStatus();
         
                     } catch (e) {
@@ -4427,6 +4425,16 @@
         
                     btn.disabled = false;
                     btn.innerHTML = originalBtnHtml;
+                }
+        
+                function resetPosModal() {
+                    document.getElementById('pos-status-icon').innerHTML =
+                        '<div class="spinner mx-auto" style="width:48px;height:48px;border-width:4px;"></div>';
+                    document.getElementById('pos-status-title').textContent = 'Terminal Ready';
+                    document.getElementById('pos-status-message').textContent =
+                        'Customer may tap, insert, or swipe their card on the reader.';
+                    document.getElementById('pos-success-actions').classList.add('hidden');
+                    document.getElementById('pos-waiting-actions').classList.remove('hidden');
                 }
         
                 function pollTerminalStatus() {
@@ -4451,50 +4459,42 @@
                                     </div>`;
                                 document.getElementById('pos-status-title').textContent = 'Payment Successful!';
                                 document.getElementById('pos-status-message').textContent = 'The card payment has been processed.';
-                                document.getElementById('pos-cancel-btn').textContent = 'Done';
-                                document.getElementById('pos-cancel-btn').className = 'btn-primary w-full py-3 rounded-xl font-semibold';
-                                document.getElementById('pos-cancel-btn').onclick = function () {
-                                    document.getElementById('pos-status-modal').classList.add('hidden');
-                                    window.location.reload();
-                                };
+                                document.getElementById('pos-waiting-actions').classList.add('hidden');
+                                document.getElementById('pos-success-actions').classList.remove('hidden');
         
-                            } else if (result.status === 'canceled' || result.status === 'requires_payment_method') {
-                                // ── FAILED / CANCELED ──
+                            } else if (result.status === 'canceled') {
+                                // Only treat explicit cancellation as terminal
                                 clearInterval(posPollingInterval);
                                 posPollingInterval = null;
         
-                                document.getElementById('pos-status-icon').innerHTML = `
-                                    <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto">
-                                        <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/>
-                                        </svg>
-                                    </div>`;
-                                document.getElementById('pos-status-title').textContent = 'Payment Failed';
-                                document.getElementById('pos-status-message').textContent = 
-                                    result.status === 'canceled' 
-                                        ? 'The payment was canceled.' 
-                                        : 'The card was declined. Please try again with a different card.';
-                                document.getElementById('pos-cancel-btn').textContent = 'Close';
-                                document.getElementById('pos-cancel-btn').className = 'btn-secondary w-full py-3 rounded-xl font-semibold';
-                                document.getElementById('pos-cancel-btn').onclick = function () {
-                                    document.getElementById('pos-status-modal').classList.add('hidden');
-                                };
+                                document.getElementById('pos-status-title').textContent = 'Transaction Canceled';
+                                document.getElementById('pos-status-message').textContent = 'The payment was canceled.';
+                                // Keep cancel button visible so they can close it manually
                             }
-                            // else: 'processing' or 'requires_action' — keep polling
+                            // All other statuses (requires_payment_method, requires_action,
+                            // processing) → keep polling, stay on "Terminal Ready"
                         } catch (e) {
                             console.error('POS polling error:', e);
+                            // Network blip — keep polling, don't close the modal
                         }
-                    }, 2000); // Poll every 2 seconds
+                    }, 3000); // Poll every 3 seconds
+                }
+        
+                function closePosModal(reload) {
+                    if (posPollingInterval) {
+                        clearInterval(posPollingInterval);
+                        posPollingInterval = null;
+                    }
+                    document.getElementById('pos-status-modal').classList.add('hidden');
+                    if (reload) window.location.reload();
                 }
         
                 async function cancelTerminalPayment() {
-                    // Stop polling
                     if (posPollingInterval) {
                         clearInterval(posPollingInterval);
                         posPollingInterval = null;
                     }
         
-                    // Tell Stripe to cancel the reader action
                     try {
                         await callAppsScript('cancelTerminalAction', {});
                     } catch (e) {
@@ -4911,6 +4911,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
