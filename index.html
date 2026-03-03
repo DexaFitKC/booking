@@ -415,14 +415,8 @@
             }
         };
         window.onerror = function(message, source, lineno, colno, error) {
-            // Suppress Turnstile/CAPTCHA and line-0 errors silently
-            if (lineno === 0 || (source && (source.includes('turnstile') || source.includes('challenges.cloudflare')))) {
-                console.warn("Suppressed external script error:", message);
-                return true;
-            }
-            // Log everything else to console but never show an alert
-            console.error("JS Error:", message, "Source:", source, "Line:", lineno);
-            return true; // Prevent default browser error dialog too
+            alert("JavaScript Error: " + message + "\nLine: " + lineno);
+            console.error("JS Error:", message, "Line:", lineno);
         };
     </script>
 
@@ -4927,6 +4921,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
