@@ -415,17 +415,14 @@
             }
         };
         window.onerror = function(message, source, lineno, colno, error) {
-            // Suppress Turnstile/CAPTCHA and line-0 errors from showing scary alerts
-            if (lineno === 0 || (source && source.includes('turnstile')) || (source && source.includes('challenges.cloudflare'))) {
+            // Suppress Turnstile/CAPTCHA and line-0 errors silently
+            if (lineno === 0 || (source && (source.includes('turnstile') || source.includes('challenges.cloudflare')))) {
                 console.warn("Suppressed external script error:", message);
-                return true; // Prevents default browser error handling
+                return true;
             }
-            console.error("JS Error:", message, "Line:", lineno);
-            // Only show alert for real app errors, not third-party scripts
-            if (source && source.includes(window.location.hostname)) {
-                alert("Something went wrong. Please refresh and try again.");
-            }
-            return true;
+            // Log everything else to console but never show an alert
+            console.error("JS Error:", message, "Source:", source, "Line:", lineno);
+            return true; // Prevent default browser error dialog too
         };
     </script>
 
@@ -4930,6 +4927,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
