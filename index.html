@@ -4281,16 +4281,17 @@
         function openAddCreditModal() {
             document.getElementById('add-credit-modal').classList.remove('hidden');
             
-            // Populate Service Dropdown
             const select = document.getElementById('new-cred-item');
-            select.innerHTML = '<option value="gc">Gift Card (GC)</option>'; // Default GC option
+            select.innerHTML = '<option value="gc">Gift Card (GC)</option>';
             
-            // Add services from state
-            if(state.services) {
-                state.services.forEach(s => {
-                    select.innerHTML += `<option value="${s.name}">${s.name}</option>`;
-                });
-            }
+            // Use state.services if already loaded or fall back to HARDCODED_SERVICES
+            const services = (state.services && state.services.length > 0) 
+                ? state.services 
+                : HARDCODED_SERVICES;
+            
+            services.forEach(s => {
+                select.innerHTML += `<option value="${s.name}">${s.name}</option>`;
+            });
         }
         
         function closeAddCreditModal() {
@@ -4938,6 +4939,7 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
+
 
 
 
