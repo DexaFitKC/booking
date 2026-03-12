@@ -1002,12 +1002,6 @@ function submitPassword() {
     dashboardType: STATE.dashboardType,
     turnstileToken: STATE.turnstileToken
   };
-  console.log('🔑 Sending password request:', {
-    action: payload.action,
-    dashboardType: payload.dashboardType,
-    passwordLength: pw.length,
-    hasTurnstileToken: !!payload.turnstileToken
-  });
  
   fetch(CONFIG.APPS_SCRIPT_URL, {
     method: 'POST',
@@ -1015,11 +1009,9 @@ function submitPassword() {
     body: JSON.stringify(payload)
   })
   .then(r => {
-    console.log('🔑 Response status:', r.status);
     return r.json();
   })
   .then(function(result) {
-    console.log('🔑 Full server response:', JSON.stringify(result));
     btn.disabled = false;
     btn.textContent = 'Unlock';
     if (result && result.valid) {
@@ -1035,7 +1027,6 @@ function submitPassword() {
     }
   })
   .catch(function(e) {
-    console.error('🔑 Fetch error:', e);
     btn.disabled = false;
     btn.textContent = 'Unlock';
     const err = document.getElementById('modal-error');
@@ -1412,7 +1403,7 @@ function renderOpsContent(appts) {
   renderCostMetrics(completed);
 
   // ─── 6. Customer Retention ───
-  renderRetention();
+  renderRetention(appts);
 
   // ─── 7. Revenue / Time Metrics ───
   renderRevenueMetrics(completed, appts);
@@ -1433,7 +1424,7 @@ function renderStatusRates(appts) {
 
   const total = appts.length;
   const completedN = counts['Completed'] || 0;
-  const cancelledN = (counts['Cancelled'] || 0) + (counts['Canceled'] || 0);
+  const cancelledN = (counts['CustCancel'] || 0) + (counts['Canceled'] || 0);
   const otherN = total - completedN - cancelledN;
 
   const section = document.getElementById('ops-status-section');
@@ -1651,13 +1642,13 @@ function renderCostMetrics(completed) {
 }
 
 // ─── CUSTOMER RETENTION ───
-function renderRetention() {
-  // Use ALL appointments (not just filtered) for retention analysis
-  const allCompleted = STATE.appointments.filter(a => a.status && a.status.toString().toLowerCase() === 'completed');
+function renderRetention(filteredAppts) {
+  const validStatuses = ['completed', 'imported'];
+  const validInRange = filteredAppts.filter(a => a.status && validStatuses.includes(a.status.toString().toLowerCase()));
 
   // Group by customer
   const custAppts = {};
-  allCompleted.forEach(a => {
+  validInRange.forEach(a => {
     const email = (a.email || '').toLowerCase().trim();
     if (!email) return;
     const d = parseDate(a.apptDate);
