@@ -2564,7 +2564,6 @@
                     processedText = processedText.replace(/(?<!href=")https?:\/\/[^\s<]+/g, '<a href="$&" target="_blank" class="text-blue-600 underline hover:text-blue-800">$&</a>');
         
                     // For checkboxes, we use the clickable label as the main label.
-                    // We do NOT use topLabelHtml here to avoid duplication.
                     inputHtml = `
                         <label class="flex items-start gap-3 cursor-pointer p-1">
                             <input type="checkbox" id="${inputId}" name="${question.id}" class="checkbox-custom mt-1" ${requiredAttr}>
@@ -2593,6 +2592,10 @@
         function submitBooking(e) {
             e.preventDefault();
             const btn = e.target.querySelector('button[type="submit"]');
+
+            // Extract referrer from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const referrer = urlParams.get('ref') || '';
             
             // STOP DOUBLE CLICKS
             if (btn.disabled) return; 
@@ -2662,7 +2665,8 @@
                 time: state.selectedTime,
                 duration: state.totalDuration,
                 price: state.totalPrice,
-                questionResponses
+                questionResponses,
+                referrer
             };
         
             callAppsScript('createBooking', bookingData)
@@ -2978,7 +2982,7 @@
                         dobInput.value = '';
                     }
 
-                    // Fix: Case-insensitive Sex selection
+                    // Case-insensitive Sex selection
                     const sexInput = document.getElementById('edit-sex');
                     const sexVal = customer.sex ? String(customer.sex).toLowerCase() : '';
                     if (sexVal === 'male' || sexVal === 'female') {
@@ -3379,8 +3383,8 @@
             
             // Load services if not present (needed for base/addon prices)
             if (!state.services || state.services.length === 0) {
-                // We reuse the hardcoded list or fetch if you have a backend call
-                // For now, assuming HARDCODED_SERVICES is available or we fetch
+                // Reuse the hardcoded list or fetch if you have a backend call
+                // Assuming HARDCODED_SERVICES is available or we fetch
                 state.services = HARDCODED_SERVICES.map(s => ({
                     ...s,
                     price: parseFloat(s.price),
@@ -3456,8 +3460,8 @@
             // We iterate selected appointments and sum the value of credits found
             let creditsUsedVal = 0;
             
-            // We need to match credits to services. 
-            // We'll use the same logic as the booking form: Sort by price desc, apply credit if name matches.
+            // Match credits to services. 
+            // Use the same logic as the booking form: Sort by price desc, apply credit if name matches.
             let sortedServices = [...services].sort((a, b) => (b.price || 0) - (a.price || 0));
             let availableCredits = JSON.parse(JSON.stringify(state.credits || [])); 
         
@@ -4047,8 +4051,6 @@
             }
 
             // 1. Classify Services
-            // FIX: Convert ID to String for reliable comparison against CLASS_A_IDS strings.
-            // FIX: Use .toLowerCase() for name checks to fix VO2 detection.
             const classA = services.filter(s => {
                 const idStr = s.id;
                 if (CLASS_A_IDS.includes(idStr)) return true;
@@ -4164,7 +4166,6 @@
             state.creditPage = 0;
             state.creditSearch = '';
             
-            // Robustly ensure "Load More" button exists
             let loadMoreDiv = document.getElementById('load-more-credits-btn');
             if (!loadMoreDiv && container) {
                 loadMoreDiv = document.createElement('div');
@@ -4741,7 +4742,7 @@
 
 
         function showGiftCardModal(isDirectLink = false) {
-            // If direct link, we need to ask for their email in the modal
+            // If direct link, ask for their email in the modal
             const buyerContainer = document.getElementById('gc-buyer-email-container');
             const buyerInput = document.getElementById('gc-buyer-email-input');
             
@@ -4939,36 +4940,3 @@ async function callAppsScript(action, data = {}) {
 </body>
 
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
