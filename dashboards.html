@@ -995,19 +995,31 @@ function submitPassword() {
   const btn = document.getElementById('pw-submit');
   btn.disabled = true;
   btn.textContent = 'Verifying...';
-
+ 
+  const payload = {
+    action: 'verifyDashboardPassword',
+    password: pw,
+    dashboardType: STATE.dashboardType,
+    turnstileToken: STATE.turnstileToken
+  };
+  console.log('🔑 Sending password request:', {
+    action: payload.action,
+    dashboardType: payload.dashboardType,
+    passwordLength: pw.length,
+    hasTurnstileToken: !!payload.turnstileToken
+  });
+ 
   fetch(CONFIG.APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({
-      action: 'verifyDashboardPassword',
-      password: pw,
-      dashboardType: STATE.dashboardType,
-      turnstileToken: STATE.turnstileToken
-    })
+    body: JSON.stringify(payload)
   })
-  .then(r => r.json())
+  .then(r => {
+    console.log('🔑 Response status:', r.status);
+    return r.json();
+  })
   .then(function(result) {
+    console.log('🔑 Full server response:', JSON.stringify(result));
     btn.disabled = false;
     btn.textContent = 'Unlock';
     if (result && result.valid) {
@@ -1023,6 +1035,7 @@ function submitPassword() {
     }
   })
   .catch(function(e) {
+    console.error('🔑 Fetch error:', e);
     btn.disabled = false;
     btn.textContent = 'Unlock';
     const err = document.getElementById('modal-error');
