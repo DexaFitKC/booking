@@ -1,0 +1,1840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DexaFit KC Dashboards</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <script>
+    const CONFIG = {
+      APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyUCDh4GLd3nHyxh7Mil5Q6HUXJASbUC6ihuWIa_4tyW5j0SXYyFa766Fax31AMqZwfWw/exec',
+      COLORS: {
+        primary: '#46A5FC',
+        secondary: '#525252',
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    };
+    window.onerror = function(message, source, lineno, colno, error) {
+      if (lineno === 0 || (source && source.includes('turnstile')) || (source && source.includes('challenges.cloudflare'))) {
+        console.warn("Suppressed external script error:", message);
+        return true;
+      }
+      console.error("JS Error:", message, "Line:", lineno);
+      if (source && source.includes(window.location.hostname)) {
+        alert("Something went wrong. Please refresh and try again.");
+      }
+      return true;
+    };
+  </script>
+  <style>
+    :root {
+      --brand-primary: #46A5FC;
+      --brand-secondary: #525252;
+      --brand-dark: #000000;
+      --brand-light: #FFFFFF;
+      --brand-primary-dark: #2d8ad9;
+      --brand-primary-light: #7ac0fd;
+      --bg: #f4f6fa;
+      --card-bg: #ffffff;
+      --card-border: #e2e6ee;
+      --text-primary: #1a1e2c;
+      --text-secondary: #6b7280;
+      --text-muted: #9ca3af;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+      --shadow-lg: 0 4px 24px rgba(0,0,0,0.08);
+      --transition: 0.2s ease;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── UTILITY ─── */
+    .hidden { display: none !important; }
+    .flex { display: flex; }
+    .flex-col { flex-direction: column; }
+    .items-center { align-items: center; }
+    .justify-center { justify-content: center; }
+    .gap-1 { gap: 8px; }
+    .gap-2 { gap: 16px; }
+    .gap-3 { gap: 24px; }
+    .text-center { text-align: center; }
+    .w-full { width: 100%; }
+    .mt-1 { margin-top: 8px; }
+    .mt-2 { margin-top: 16px; }
+    .mt-3 { margin-top: 24px; }
+    .mb-1 { margin-bottom: 8px; }
+    .mb-2 { margin-bottom: 16px; }
+    .mb-3 { margin-bottom: 24px; }
+
+    /* ─── LANDING PAGE ─── */
+    .landing {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      background: linear-gradient(160deg, #f4f6fa 0%, #e8f0fe 50%, #f4f6fa 100%);
+    }
+
+    .landing-logo {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      color: var(--brand-dark);
+      margin-bottom: 8px;
+    }
+    .landing-logo span { color: var(--brand-primary); }
+
+    .landing-sub {
+      font-size: 15px;
+      color: var(--text-secondary);
+      font-weight: 400;
+      margin-bottom: 48px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .landing-cards {
+      display: flex;
+      gap: 28px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .landing-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 40px 36px;
+      width: 300px;
+      text-align: center;
+      cursor: pointer;
+      transition: all var(--transition);
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+    .landing-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: var(--brand-primary);
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+    }
+    .landing-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--brand-primary-light);
+    }
+    .landing-card:hover::before { transform: scaleX(1); }
+
+    .landing-card-icon {
+      width: 64px; height: 64px;
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 28px;
+    }
+    .landing-card-icon.ops { background: #eef7ff; color: var(--brand-primary); }
+    .landing-card-icon.mktg { background: #fef3e2; color: #f59e0b; }
+
+    .landing-card h3 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .landing-card p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* ─── MODAL ─── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 36px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: var(--shadow-lg);
+      animation: modalIn 0.25s ease;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.95) translateY(8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .modal h3 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .modal p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+
+    .modal-error {
+      background: #fef2f2;
+      color: var(--danger);
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 16px;
+    }
+
+    /* ─── FORM ELEMENTS ─── */
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="date"],
+    select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      color: var(--text-primary);
+      background: var(--card-bg);
+      transition: border-color var(--transition);
+      outline: none;
+    }
+    input:focus, select:focus {
+      border-color: var(--brand-primary);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .btn-primary {
+      background: var(--brand-primary);
+      color: white;
+    }
+    .btn-primary:hover { background: var(--brand-primary-dark); }
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: var(--bg);
+      color: var(--text-primary);
+      border: 1.5px solid var(--card-border);
+    }
+    .btn-secondary:hover { background: #e8ebf0; }
+    .btn-sm { padding: 6px 14px; font-size: 13px; }
+    .btn-ghost {
+      background: none;
+      border: none;
+      color: var(--brand-primary);
+      padding: 6px 10px;
+      font-weight: 600;
+    }
+    .btn-ghost:hover { text-decoration: underline; }
+
+    /* ─── TOGGLE SWITCH ─── */
+    .toggle-group {
+      display: inline-flex;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      padding: 3px;
+      border: 1.5px solid var(--card-border);
+    }
+    .toggle-group .toggle-opt {
+      padding: 7px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all var(--transition);
+      border: none;
+      background: none;
+      font-family: 'Outfit', sans-serif;
+    }
+    .toggle-group .toggle-opt.active {
+      background: var(--brand-primary);
+      color: white;
+      font-weight: 600;
+    }
+
+    /* ─── DASHBOARD LAYOUT ─── */
+    .dash-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .dash-header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--card-border);
+      padding: 0 28px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .dash-header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .dash-brand {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .dash-brand span { color: var(--brand-primary); }
+
+    .dash-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .dash-badge.ops { background: #eef7ff; color: var(--brand-primary); }
+    .dash-badge.mktg { background: #fef3e2; color: #d97706; }
+
+    .dash-back {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: none;
+      font-family: 'Outfit', sans-serif;
+      transition: color var(--transition);
+    }
+    .dash-back:hover { color: var(--brand-primary); }
+
+    .dash-body {
+      flex: 1;
+      padding: 28px;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* ─── FILTER BAR ─── */
+    .filter-bar {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: flex-end;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      min-width: 140px;
+    }
+    .filter-group.grow { flex: 1; min-width: 180px; }
+
+    /* ─── STAT CARDS ─── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      transition: all var(--transition);
+      position: relative;
+    }
+    .stat-card:hover {
+      border-color: var(--brand-primary-light);
+      box-shadow: var(--shadow-lg);
+    }
+    .stat-card::after {
+      content: 'Click for details →';
+      position: absolute;
+      bottom: 8px;
+      right: 12px;
+      font-size: 10px;
+      color: var(--text-muted);
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+    .stat-card:hover::after { opacity: 1; }
+
+    .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      color: var(--text-primary);
+      line-height: 1.1;
+    }
+
+    .stat-expected {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      font-weight: 500;
+    }
+
+    .stat-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* ─── DATA TABLE ─── */
+    .table-wrap {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    .table-title {
+      padding: 16px 20px;
+      font-size: 15px;
+      font-weight: 700;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    th {
+      background: var(--bg);
+      padding: 10px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--card-border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 10px 16px;
+      border-bottom: 1px solid #f3f4f6;
+      white-space: nowrap;
+    }
+
+    tr:hover td { background: #f9fafb; }
+
+    /* ─── SECTION PANELS ─── */
+    .section-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+
+    .section-title {
+      padding: 16px 20px;
+      font-size: 15px;
+      font-weight: 700;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .section-body { padding: 20px; }
+
+    /* ─── BAR CHART (CSS) ─── */
+    .bar-chart { display: flex; flex-direction: column; gap: 8px; }
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .bar-label {
+      width: 80px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .bar-track {
+      flex: 1;
+      height: 28px;
+      background: var(--bg);
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    .bar-fill {
+      height: 100%;
+      background: var(--brand-primary);
+      border-radius: 6px;
+      transition: width 0.6s ease;
+      display: flex;
+      align-items: center;
+      padding-left: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+      min-width: fit-content;
+    }
+    .bar-val {
+      width: 50px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+      flex-shrink: 0;
+    }
+
+    /* ─── HORIZONTAL TABLE GRID ─── */
+    .h-grid {
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .h-grid-header {
+      display: contents;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      color: var(--text-secondary);
+    }
+    .h-grid-header > div { 
+      padding: 8px 10px;
+      background: var(--bg);
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    .h-grid-row { display: contents; }
+    .h-grid-row > div {
+      padding: 8px 10px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .h-grid-row > div:first-child { font-weight: 600; }
+
+    /* ─── RETENTION DONUT (CSS) ─── */
+    .donut-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      justify-content: center;
+    }
+    .donut-item {
+      text-align: center;
+      width: 110px;
+    }
+    .donut-ring {
+      width: 90px; height: 90px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 8px;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .donut-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    /* ─── MARKETING SUB-NAV ─── */
+    .mktg-subnav {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .mktg-subnav .btn { flex: 1; max-width: 220px; }
+    .mktg-subnav .btn.active {
+      background: var(--brand-primary);
+      color: white;
+      border-color: var(--brand-primary);
+    }
+
+    /* ─── DETAIL OVERLAY ─── */
+    .detail-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(4px);
+      z-index: 500;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 60px 20px 20px;
+      overflow-y: auto;
+    }
+
+    .detail-panel {
+      background: var(--card-bg);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 1000px;
+      box-shadow: var(--shadow-lg);
+      animation: modalIn 0.25s ease;
+      overflow: hidden;
+    }
+
+    .detail-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .detail-header h3 { font-size: 17px; font-weight: 700; }
+    .detail-close {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg);
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      color: var(--text-secondary);
+      transition: all var(--transition);
+    }
+    .detail-close:hover { background: #e8ebf0; }
+
+    .detail-body { max-height: 65vh; overflow-y: auto; }
+
+    /* ─── LOADING ─── */
+    .loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px;
+      gap: 16px;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--card-border);
+      border-top-color: var(--brand-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loader-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 640px) {
+      .dash-body { padding: 16px; }
+      .filter-row { flex-direction: column; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .stat-value { font-size: 24px; }
+      .landing-card { width: 100%; max-width: 300px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════ LANDING PAGE ════════════════════ -->
+<div id="page-landing" class="landing">
+  <div class="landing-logo">Dexa<span>Fit</span></div>
+  <div class="landing-sub">Dashboard Portal</div>
+
+  <div class="mb-2 flex justify-center">
+    <div class="cf-turnstile" data-sitekey="0x4AAAAAACe7Xzo-HnnSOxBi" data-theme="light" data-size="flexible"></div>
+  </div>
+
+  <div class="landing-cards">
+    <div class="landing-card" onclick="promptPassword('operations')">
+      <div class="landing-card-icon ops">
+        <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </div>
+      <h3>Operations</h3>
+      <p>Service metrics, retention, scheduling analytics &amp; performance KPIs</p>
+    </div>
+    <div class="landing-card" onclick="promptPassword('marketing')">
+      <div class="landing-card-icon mktg">
+        <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+      </div>
+      <h3>Marketing</h3>
+      <p>Referrer tracking, discount performance &amp; campaign attribution</p>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ PASSWORD MODAL ════════════════════ -->
+<div id="modal-password" class="modal-overlay hidden" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3 id="modal-title">Dashboard Access</h3>
+    <p id="modal-desc">Enter the password to continue.</p>
+    <div id="modal-error" class="modal-error hidden"></div>
+    <div class="mb-2">
+      <label for="pw-input">Password</label>
+      <input type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')submitPassword()">
+    </div>
+    <div class="flex gap-1" style="justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="pw-submit" onclick="submitPassword()">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ DETAIL OVERLAY ════════════════════ -->
+<div id="detail-overlay" class="detail-overlay hidden" onclick="if(event.target===this)closeDetail()">
+  <div class="detail-panel">
+    <div class="detail-header">
+      <h3 id="detail-title">Detail</h3>
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="detail-body" id="detail-body"></div>
+  </div>
+</div>
+
+<!-- ════════════════════ MARKETING DASHBOARD ════════════════════ -->
+<div id="page-marketing" class="dash-container hidden">
+  <div class="dash-header">
+    <div class="dash-header-left">
+      <div class="dash-brand">Dexa<span>Fit</span></div>
+      <div class="dash-badge mktg">Marketing</div>
+    </div>
+    <button class="dash-back" onclick="goHome()">← Back to Portal</button>
+  </div>
+  <div class="dash-body">
+    <!-- Sub-nav -->
+    <div class="mktg-subnav">
+      <button class="btn btn-secondary active" id="btn-referrer" onclick="setMktgMode('referrer')">Referrer Tracking</button>
+      <button class="btn btn-secondary" id="btn-discount" onclick="setMktgMode('discount')">Discount Tracking</button>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-bar">
+      <div class="filter-row">
+        <div class="filter-group">
+          <label>Start Date</label>
+          <input type="date" id="mktg-start">
+        </div>
+        <div class="filter-group">
+          <label>End Date</label>
+          <input type="date" id="mktg-end">
+        </div>
+        <div class="filter-group">
+          <label>Date Type</label>
+          <div class="toggle-group">
+            <button class="toggle-opt active" id="mktg-toggle-booked" onclick="setMktgDateType('booked')">Booked Within</button>
+            <button class="toggle-opt" id="mktg-toggle-happened" onclick="setMktgDateType('happened')">Happened Within</button>
+          </div>
+        </div>
+        <div class="filter-group grow" id="mktg-referrer-group">
+          <label>Referrer</label>
+          <input type="text" id="mktg-referrer" placeholder="Enter referrer name">
+        </div>
+        <div class="filter-group grow hidden" id="mktg-discount-group">
+          <label>Discount</label>
+          <select id="mktg-discount">
+            <option value="" disabled selected>Select a discount</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" onclick="runMktgFilter()">Apply Filters</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div id="mktg-loading" class="loader hidden">
+      <div class="spinner"></div>
+      <div class="loader-text">Loading data...</div>
+    </div>
+
+    <div id="mktg-stats" class="hidden">
+      <div class="stat-grid" id="mktg-stat-cards"></div>
+    </div>
+
+    <div id="mktg-empty" class="hidden" style="text-align:center;padding:40px;color:var(--text-muted);">
+      <p style="font-size:16px;font-weight:600;">No results found</p>
+      <p style="font-size:13px;margin-top:6px;">Adjust your filters and try again.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ OPERATIONS DASHBOARD ════════════════════ -->
+<div id="page-operations" class="dash-container hidden">
+  <div class="dash-header">
+    <div class="dash-header-left">
+      <div class="dash-brand">Dexa<span>Fit</span></div>
+      <div class="dash-badge ops">Operations</div>
+    </div>
+    <button class="dash-back" onclick="goHome()">← Back to Portal</button>
+  </div>
+  <div class="dash-body">
+    <!-- Filters -->
+    <div class="filter-bar">
+      <div class="filter-row">
+        <div class="filter-group">
+          <label>Start Date</label>
+          <input type="date" id="ops-start">
+        </div>
+        <div class="filter-group">
+          <label>End Date</label>
+          <input type="date" id="ops-end">
+        </div>
+        <div class="filter-group">
+          <label>Date Type</label>
+          <div class="toggle-group">
+            <button class="toggle-opt active" id="ops-toggle-happened" onclick="setOpsDateType('happened')">Appointment Date</button>
+            <button class="toggle-opt" id="ops-toggle-booked" onclick="setOpsDateType('booked')">Booking Date</button>
+          </div>
+        </div>
+        <div class="filter-group">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" onclick="runOpsFilter()">Apply Filters</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="ops-loading" class="loader hidden">
+      <div class="spinner"></div>
+      <div class="loader-text">Loading data...</div>
+    </div>
+
+    <div id="ops-content" class="hidden">
+      <!-- Status Rates -->
+      <div class="section-panel mb-3" id="ops-status-section"></div>
+
+      <!-- Appointment Count by Day of Week -->
+      <div class="section-panel mb-3" id="ops-dow-section"></div>
+
+      <!-- Service Count by Service by Day of Week -->
+      <div class="section-panel mb-3" id="ops-service-dow-section"></div>
+
+      <!-- Average Lead Time -->
+      <div class="section-panel mb-3" id="ops-leadtime-section"></div>
+
+      <!-- Average Cost by DOW and Per Client -->
+      <div class="section-panel mb-3" id="ops-cost-section"></div>
+
+      <!-- Customer Retention -->
+      <div class="section-panel mb-3" id="ops-retention-section"></div>
+
+      <!-- Revenue / Time Metrics -->
+      <div class="section-panel mb-3" id="ops-revenue-section"></div>
+
+      <!-- Top 20 Customers -->
+      <div class="section-panel mb-3" id="ops-top-section"></div>
+    </div>
+
+    <div id="ops-empty" class="hidden" style="text-align:center;padding:40px;color:var(--text-muted);">
+      <p style="font-size:16px;font-weight:600;">No results found</p>
+      <p style="font-size:13px;margin-top:6px;">Adjust your filters and try again.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ JAVASCRIPT ════════════════════ -->
+<script>
+// ─── STATE ───
+const STATE = {
+  dashboardType: null,
+  password: null,
+  turnstileToken: null,
+  appointments: [],
+  customers: [],
+  customerMap: {},     // email -> customer
+  discountValues: [],
+  mktgMode: 'referrer',
+  mktgDateType: 'booked',
+  opsDateType: 'happened',
+  dataLoaded: false
+};
+
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+// ─── NAVIGATION ───
+function showPage(id) {
+  document.querySelectorAll('[id^="page-"]').forEach(p => p.classList.add('hidden'));
+  document.getElementById('page-' + id).classList.remove('hidden');
+}
+
+function goHome() {
+  STATE.dataLoaded = false;
+  STATE.password = null;
+  showPage('landing');
+}
+
+// ─── PASSWORD MODAL ───
+function promptPassword(type) {
+  // Check turnstile
+  const token = document.querySelector('[name="cf-turnstile-response"]');
+  if (!token || !token.value) {
+    alert('Please complete the security verification first.');
+    return;
+  }
+  STATE.turnstileToken = token.value;
+  STATE.dashboardType = type;
+  const name = type === 'operations' ? 'Operations' : 'Marketing';
+  document.getElementById('modal-title').textContent = name + ' Dashboard';
+  document.getElementById('modal-desc').textContent = 'Enter the ' + name.toLowerCase() + ' password to continue.';
+  document.getElementById('modal-error').classList.add('hidden');
+  document.getElementById('pw-input').value = '';
+  document.getElementById('modal-password').classList.remove('hidden');
+  setTimeout(() => document.getElementById('pw-input').focus(), 100);
+}
+
+function closeModal() {
+  document.getElementById('modal-password').classList.add('hidden');
+}
+
+function submitPassword() {
+  const pw = document.getElementById('pw-input').value.trim();
+  if (!pw) return;
+  const btn = document.getElementById('pw-submit');
+  btn.disabled = true;
+  btn.textContent = 'Verifying...';
+
+  fetch(CONFIG.APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'verifyDashboardPassword',
+      password: pw,
+      dashboardType: STATE.dashboardType,
+      turnstileToken: STATE.turnstileToken
+    })
+  })
+  .then(r => r.json())
+  .then(function(result) {
+    btn.disabled = false;
+    btn.textContent = 'Unlock';
+    if (result && result.valid) {
+      STATE.password = pw;
+      closeModal();
+      openDashboard(STATE.dashboardType);
+    } else {
+      const err = document.getElementById('modal-error');
+      err.textContent = 'Incorrect password. Please try again.';
+      err.classList.remove('hidden');
+      document.getElementById('pw-input').value = '';
+      document.getElementById('pw-input').focus();
+    }
+  })
+  .catch(function(e) {
+    btn.disabled = false;
+    btn.textContent = 'Unlock';
+    const err = document.getElementById('modal-error');
+    err.textContent = 'An error occurred. Please try again.';
+    err.classList.remove('hidden');
+  });
+}
+
+// ─── OPEN DASHBOARD ───
+function openDashboard(type) {
+  showPage(type);
+  if (!STATE.dataLoaded) {
+    loadData(type);
+  }
+}
+
+function loadData(type) {
+  const loadingEl = document.getElementById(type === 'marketing' ? 'mktg-loading' : 'ops-loading');
+  loadingEl.classList.remove('hidden');
+
+  fetch(CONFIG.APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'getDashboardData',
+      password: STATE.password,
+      dashboardType: STATE.dashboardType,
+      turnstileToken: STATE.turnstileToken
+    })
+  })
+  .then(r => r.json())
+  .then(function(data) {
+      loadingEl.classList.add('hidden');
+      if (data.error) {
+        alert('Error: ' + data.error);
+        return;
+      }
+      STATE.appointments = data.appointments || [];
+      STATE.customers = data.customers || [];
+      STATE.discountValues = data.discountValues || [];
+      STATE.dataLoaded = true;
+
+      // Build customer lookup
+      STATE.customerMap = {};
+      STATE.customers.forEach(c => {
+        if (c.email) STATE.customerMap[c.email.toString().toLowerCase().trim()] = c;
+      });
+
+      // Populate discount dropdown
+      const sel = document.getElementById('mktg-discount');
+      sel.innerHTML = '<option value="" disabled selected>Select a discount</option>';
+      STATE.discountValues.forEach(d => {
+        const o = document.createElement('option');
+        o.value = d;
+        o.textContent = d;
+        sel.appendChild(o);
+      });
+
+      // Set default date range (last 90 days)
+      const today = new Date();
+      const ago90 = new Date(today);
+      ago90.setDate(ago90.getDate() - 90);
+      const fmt = d => d.toISOString().split('T')[0];
+      if (type === 'marketing') {
+        document.getElementById('mktg-start').value = fmt(ago90);
+        document.getElementById('mktg-end').value = fmt(today);
+      } else {
+        document.getElementById('ops-start').value = fmt(ago90);
+        document.getElementById('ops-end').value = fmt(today);
+      }
+
+      if (type === 'operations') {
+        runOpsFilter();
+      }
+  })
+  .catch(function(e) {
+      loadingEl.classList.add('hidden');
+      alert('Failed to load data. Please try again.');
+  });
+}
+
+// ─── UTILITY FUNCTIONS ───
+function parseDate(val) {
+  if (!val) return null;
+  if (val instanceof Date) return val;
+  const s = val.toString();
+  // ISO format
+  if (s.includes('T')) return new Date(s);
+  // M/D/YY or M/D/YYYY
+  const parts = s.split('/');
+  if (parts.length === 3) {
+    let [m, d, y] = parts.map(Number);
+    if (y < 100) y += 2000;
+    return new Date(y, m - 1, d);
+  }
+  return new Date(s);
+}
+
+function calcAge(dob) {
+  if (!dob) return null;
+  const d = parseDate(dob);
+  if (!d || isNaN(d)) return null;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const m = today.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+  return age >= 0 && age < 120 ? age : null;
+}
+
+function parseServices(svc) {
+  if (!svc) return [];
+  return svc.toString().split(',').map(s => s.trim()).filter(s => s);
+}
+
+function daysBetween(a, b) {
+  const d1 = parseDate(a);
+  const d2 = parseDate(b);
+  if (!d1 || !d2 || isNaN(d1) || isNaN(d2)) return null;
+  return Math.round(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
+}
+
+function fmtCurrency(n) {
+  return '$' + Number(n).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function fmtPct(n) {
+  return Number(n).toFixed(1) + '%';
+}
+
+function getCustomer(email) {
+  if (!email) return null;
+  return STATE.customerMap[email.toString().toLowerCase().trim()] || null;
+}
+
+function fmtDate(d) {
+  const dt = parseDate(d);
+  if (!dt || isNaN(dt)) return '—';
+  return (dt.getMonth()+1) + '/' + dt.getDate() + '/' + dt.getFullYear();
+}
+
+// ─── MARKETING DASHBOARD LOGIC ───
+function setMktgMode(mode) {
+  STATE.mktgMode = mode;
+  document.getElementById('btn-referrer').classList.toggle('active', mode === 'referrer');
+  document.getElementById('btn-discount').classList.toggle('active', mode === 'discount');
+  document.getElementById('mktg-referrer-group').classList.toggle('hidden', mode !== 'referrer');
+  document.getElementById('mktg-discount-group').classList.toggle('hidden', mode !== 'discount');
+  // Clear previous results
+  document.getElementById('mktg-stats').classList.add('hidden');
+  document.getElementById('mktg-empty').classList.add('hidden');
+}
+
+function setMktgDateType(type) {
+  STATE.mktgDateType = type;
+  document.getElementById('mktg-toggle-booked').classList.toggle('active', type === 'booked');
+  document.getElementById('mktg-toggle-happened').classList.toggle('active', type === 'happened');
+}
+
+function runMktgFilter() {
+  const startVal = document.getElementById('mktg-start').value;
+  const endVal = document.getElementById('mktg-end').value;
+  const start = startVal ? new Date(startVal + 'T00:00:00') : null;
+  const end = endVal ? new Date(endVal + 'T23:59:59') : null;
+
+  let filterVal;
+  if (STATE.mktgMode === 'referrer') {
+    filterVal = document.getElementById('mktg-referrer').value.trim();
+    if (!filterVal) { alert('Please enter a referrer.'); return; }
+  } else {
+    filterVal = document.getElementById('mktg-discount').value;
+    if (!filterVal) { alert('Please select a discount.'); return; }
+  }
+
+  // Filter appointments
+  const allFiltered = STATE.appointments.filter(a => {
+    // Match referrer or discount
+    if (STATE.mktgMode === 'referrer') {
+      if (!a.referrer || a.referrer.toString().toLowerCase().indexOf(filterVal.toLowerCase()) === -1) return false;
+    } else {
+      if (!a.discount || a.discount.toString() !== filterVal) return false;
+    }
+
+    // Date filter
+    const dateField = STATE.mktgDateType === 'booked' ? a.bookingDate : a.apptDate;
+    const d = parseDate(dateField);
+    if (!d || isNaN(d)) return false;
+    if (start && d < start) return false;
+    if (end && d > end) return false;
+
+    return true;
+  });
+
+  const completed = allFiltered.filter(a => a.status && a.status.toString().toLowerCase() === 'completed');
+
+  if (allFiltered.length === 0) {
+    document.getElementById('mktg-stats').classList.add('hidden');
+    document.getElementById('mktg-empty').classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('mktg-empty').classList.add('hidden');
+  renderMktgStats(completed, allFiltered);
+}
+
+function renderMktgStats(completed, all) {
+  // Compute stats for both completed and all
+  function computeStats(appts) {
+    const apptCount = appts.length;
+    let serviceCount = 0;
+    let totalCost = 0;
+    const sexCounts = {};
+    const ages = [];
+
+    appts.forEach(a => {
+      serviceCount += parseServices(a.services).length;
+      totalCost += Number(a.cost) || 0;
+      const cust = getCustomer(a.email);
+      if (cust) {
+        const sex = (cust.sex || 'Unknown').toString().trim();
+        const sexKey = sex.charAt(0).toUpperCase() + sex.slice(1).toLowerCase();
+        sexCounts[sexKey] = (sexCounts[sexKey] || 0) + 1;
+        const age = calcAge(cust.dob);
+        if (age !== null) ages.push(age);
+      }
+    });
+
+    const avgAge = ages.length ? (ages.reduce((s,v) => s+v, 0) / ages.length) : null;
+    return { apptCount, serviceCount, totalCost, sexCounts, avgAge, ages, appts };
+  }
+
+  const cStats = computeStats(completed);
+  const aStats = computeStats(all);
+
+  // Build stat cards
+  const container = document.getElementById('mktg-stat-cards');
+  container.innerHTML = '';
+
+  const cards = [
+    { label: 'Appointments', value: cStats.apptCount, expected: aStats.apptCount, key: 'appointments' },
+    { label: 'Services', value: cStats.serviceCount, expected: aStats.serviceCount, key: 'services' },
+    { label: 'Total Est. Cost', value: fmtCurrency(cStats.totalCost), expected: fmtCurrency(aStats.totalCost), key: 'cost' },
+    { label: 'Avg Age', value: cStats.avgAge !== null ? cStats.avgAge.toFixed(1) : '—', expected: aStats.avgAge !== null ? aStats.avgAge.toFixed(1) : '—', key: 'age' },
+  ];
+
+  // Add sex breakdown cards
+  const allSexKeys = new Set([...Object.keys(cStats.sexCounts), ...Object.keys(aStats.sexCounts)]);
+  allSexKeys.forEach(sex => {
+    cards.push({
+      label: sex,
+      value: cStats.sexCounts[sex] || 0,
+      expected: aStats.sexCounts[sex] || 0,
+      key: 'sex_' + sex
+    });
+  });
+
+  cards.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'stat-card';
+    div.innerHTML = `
+      <div class="stat-label">${c.label}</div>
+      <div class="stat-value">${c.value}</div>
+      <div class="stat-expected">Expected: ${c.expected}</div>
+    `;
+    div.onclick = () => showMktgDetail(c.key, cStats, aStats, completed, all);
+    container.appendChild(div);
+  });
+
+  document.getElementById('mktg-stats').classList.remove('hidden');
+}
+
+function showMktgDetail(key, cStats, aStats, completed, all) {
+  const title = document.getElementById('detail-title');
+  const body = document.getElementById('detail-body');
+
+  let appts = completed;
+  let label = 'Completed Appointments';
+  if (key === 'age') {
+    label = 'Age Detail — Completed Appointments';
+  } else if (key.startsWith('sex_')) {
+    const sex = key.replace('sex_', '');
+    appts = completed.filter(a => {
+      const c = getCustomer(a.email);
+      if (!c) return false;
+      const s = (c.sex || 'Unknown').toString().trim();
+      return (s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()) === sex;
+    });
+    label = sex + ' — Completed Appointments';
+  }
+
+  title.textContent = label + ' (' + appts.length + ')';
+
+  let html = '<table><thead><tr><th>Email</th><th>Appt Date</th><th>Services</th><th>Est. Cost</th><th>Status</th>';
+  if (key === 'age') html += '<th>Age</th>';
+  if (key.startsWith('sex_')) html += '<th>Sex</th>';
+  html += '<th>Referrer</th><th>Discount</th></tr></thead><tbody>';
+
+  appts.forEach(a => {
+    const cust = getCustomer(a.email);
+    html += '<tr>';
+    html += '<td>' + (a.email || '—') + '</td>';
+    html += '<td>' + fmtDate(a.apptDate) + '</td>';
+    html += '<td>' + (a.services || '—') + '</td>';
+    html += '<td>' + fmtCurrency(a.cost || 0) + '</td>';
+    html += '<td>' + (a.status || '—') + '</td>';
+    if (key === 'age') {
+      const age = cust ? calcAge(cust.dob) : null;
+      html += '<td>' + (age !== null ? age : '—') + '</td>';
+    }
+    if (key.startsWith('sex_')) {
+      html += '<td>' + (cust ? cust.sex || '—' : '—') + '</td>';
+    }
+    html += '<td>' + (a.referrer || '—') + '</td>';
+    html += '<td>' + (a.discount || '—') + '</td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  body.innerHTML = html;
+  document.getElementById('detail-overlay').classList.remove('hidden');
+}
+
+function closeDetail() {
+  document.getElementById('detail-overlay').classList.add('hidden');
+}
+
+// ─── OPERATIONS DASHBOARD LOGIC ───
+function setOpsDateType(type) {
+  STATE.opsDateType = type;
+  document.getElementById('ops-toggle-happened').classList.toggle('active', type === 'happened');
+  document.getElementById('ops-toggle-booked').classList.toggle('active', type === 'booked');
+}
+
+function runOpsFilter() {
+  const startVal = document.getElementById('ops-start').value;
+  const endVal = document.getElementById('ops-end').value;
+  const start = startVal ? new Date(startVal + 'T00:00:00') : null;
+  const end = endVal ? new Date(endVal + 'T23:59:59') : null;
+
+  const filtered = STATE.appointments.filter(a => {
+    const dateField = STATE.opsDateType === 'booked' ? a.bookingDate : a.apptDate;
+    const d = parseDate(dateField);
+    if (!d || isNaN(d)) return false;
+    if (start && d < start) return false;
+    if (end && d > end) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    document.getElementById('ops-content').classList.add('hidden');
+    document.getElementById('ops-empty').classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('ops-empty').classList.add('hidden');
+  renderOpsContent(filtered);
+}
+
+function renderOpsContent(appts) {
+  const completed = appts.filter(a => a.status && a.status.toString().toLowerCase() === 'completed');
+
+  // ─── 1. Status Rates ───
+  renderStatusRates(appts);
+
+  // ─── 2. Appointment Count by DOW ───
+  renderApptByDow(appts);
+
+  // ─── 3. Service Count by Service by DOW ───
+  renderServiceByDow(completed);
+
+  // ─── 4. Average Lead Time ───
+  renderLeadTime(appts);
+
+  // ─── 5. Average Cost by DOW and Per Client ───
+  renderCostMetrics(completed);
+
+  // ─── 6. Customer Retention ───
+  renderRetention();
+
+  // ─── 7. Revenue / Time Metrics ───
+  renderRevenueMetrics(completed, appts);
+
+  // ─── 8. Top 20 Customers ───
+  renderTop20(completed);
+
+  document.getElementById('ops-content').classList.remove('hidden');
+}
+
+// ─── STATUS RATES ───
+function renderStatusRates(appts) {
+  const counts = {};
+  appts.forEach(a => {
+    const s = (a.status || 'Unknown').toString().trim();
+    counts[s] = (counts[s] || 0) + 1;
+  });
+
+  const total = appts.length;
+  const completedN = counts['Completed'] || 0;
+  const cancelledN = (counts['Cancelled'] || 0) + (counts['Canceled'] || 0);
+  const otherN = total - completedN - cancelledN;
+
+  const section = document.getElementById('ops-status-section');
+  section.innerHTML = `
+    <div class="section-title">Appointment Status Rates</div>
+    <div class="section-body">
+      <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+        <div class="stat-card" style="cursor:default; border-left: 4px solid var(--success);">
+          <div class="stat-label">Completed</div>
+          <div class="stat-value" style="color:var(--success);">${fmtPct(total ? completedN/total*100 : 0)}</div>
+          <div class="stat-sub">${completedN} of ${total}</div>
+        </div>
+        <div class="stat-card" style="cursor:default; border-left: 4px solid var(--danger);">
+          <div class="stat-label">Cancelled</div>
+          <div class="stat-value" style="color:var(--danger);">${fmtPct(total ? cancelledN/total*100 : 0)}</div>
+          <div class="stat-sub">${cancelledN} of ${total}</div>
+        </div>
+        <div class="stat-card" style="cursor:default; border-left: 4px solid var(--warning);">
+          <div class="stat-label">Other</div>
+          <div class="stat-value" style="color:var(--warning);">${fmtPct(total ? otherN/total*100 : 0)}</div>
+          <div class="stat-sub">${otherN} of ${total}</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;">
+        <table><thead><tr><th>Status</th><th>Count</th><th>%</th></tr></thead><tbody>
+        ${Object.entries(counts).sort((a,b) => b[1]-a[1]).map(([s,c]) =>
+          `<tr><td>${s}</td><td>${c}</td><td>${fmtPct(total ? c/total*100 : 0)}</td></tr>`
+        ).join('')}
+        </tbody></table>
+      </div>
+    </div>
+  `;
+}
+
+// ─── APPT BY DOW ───
+function renderApptByDow(appts) {
+  const dowCounts = [0,0,0,0,0,0,0];
+  appts.forEach(a => {
+    const d = parseDate(a.apptDate);
+    if (d && !isNaN(d)) dowCounts[d.getDay()]++;
+  });
+  const max = Math.max(...dowCounts, 1);
+
+  const section = document.getElementById('ops-dow-section');
+  section.innerHTML = `
+    <div class="section-title">Appointments by Day of Week</div>
+    <div class="section-body">
+      <div class="bar-chart">
+        ${DAYS_SHORT.map((day, i) => `
+          <div class="bar-row">
+            <div class="bar-label">${day}</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${(dowCounts[i]/max*100).toFixed(1)}%;${dowCounts[i]===0?'padding:0;':''}">
+                ${dowCounts[i] > 0 ? dowCounts[i] : ''}
+              </div>
+            </div>
+            <div class="bar-val">${dowCounts[i]}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ─── SERVICE BY DOW ───
+function renderServiceByDow(appts) {
+  const serviceMap = {};
+  appts.forEach(a => {
+    const d = parseDate(a.apptDate);
+    if (!d || isNaN(d)) return;
+    const dow = d.getDay();
+    parseServices(a.services).forEach(svc => {
+      if (!serviceMap[svc]) serviceMap[svc] = [0,0,0,0,0,0,0];
+      serviceMap[svc][dow]++;
+    });
+  });
+
+  const services = Object.keys(serviceMap).sort();
+  const section = document.getElementById('ops-service-dow-section');
+
+  let tableHTML = `<div class="table-scroll"><table><thead><tr><th>Service</th>`;
+  DAYS_SHORT.forEach(d => tableHTML += `<th style="text-align:center">${d}</th>`);
+  tableHTML += `<th style="text-align:center">Total</th></tr></thead><tbody>`;
+
+  services.forEach(svc => {
+    const row = serviceMap[svc];
+    const total = row.reduce((s,v) => s+v, 0);
+    tableHTML += `<tr><td style="white-space:normal;max-width:250px;">${svc}</td>`;
+    row.forEach(v => tableHTML += `<td style="text-align:center">${v || '—'}</td>`);
+    tableHTML += `<td style="text-align:center;font-weight:600;">${total}</td></tr>`;
+  });
+  tableHTML += '</tbody></table></div>';
+
+  section.innerHTML = `
+    <div class="section-title">Service Count by Day of Week (Completed)</div>
+    <div class="section-body">${tableHTML}</div>
+  `;
+}
+
+// ─── LEAD TIME ───
+function renderLeadTime(appts) {
+  const leadTimes = [];
+  const dowLeadTimes = [[],[],[],[],[],[],[]];
+
+  appts.forEach(a => {
+    const apptD = parseDate(a.apptDate);
+    const bookD = parseDate(a.bookingDate);
+    if (!apptD || !bookD || isNaN(apptD) || isNaN(bookD)) return;
+    const diff = Math.round((apptD - bookD) / (1000 * 60 * 60 * 24));
+    if (diff >= 0 && diff < 365) {
+      leadTimes.push(diff);
+      dowLeadTimes[apptD.getDay()].push(diff);
+    }
+  });
+
+  const avg = leadTimes.length ? (leadTimes.reduce((s,v)=>s+v,0)/leadTimes.length) : 0;
+  const median = leadTimes.length ? leadTimes.sort((a,b)=>a-b)[Math.floor(leadTimes.length/2)] : 0;
+
+  const section = document.getElementById('ops-leadtime-section');
+  section.innerHTML = `
+    <div class="section-title">Appointment Lead Time (Booking → Appointment)</div>
+    <div class="section-body">
+      <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-bottom: 20px;">
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-label">Average</div>
+          <div class="stat-value">${avg.toFixed(1)}<span style="font-size:16px;font-weight:500;color:var(--text-secondary);"> days</span></div>
+        </div>
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-label">Median</div>
+          <div class="stat-value">${median}<span style="font-size:16px;font-weight:500;color:var(--text-secondary);"> days</span></div>
+        </div>
+      </div>
+      <div class="bar-chart">
+        ${DAYS_SHORT.map((day, i) => {
+          const arr = dowLeadTimes[i];
+          const a = arr.length ? (arr.reduce((s,v)=>s+v,0)/arr.length).toFixed(1) : '0';
+          const maxLead = Math.max(...DAYS_SHORT.map((_,j) => dowLeadTimes[j].length ? dowLeadTimes[j].reduce((s,v)=>s+v,0)/dowLeadTimes[j].length : 0), 1);
+          return `
+            <div class="bar-row">
+              <div class="bar-label">${day}</div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${(a/maxLead*100).toFixed(1)}%;background:#7ac0fd;${a==='0'?'padding:0;':''}">
+                  ${a > 0 ? a + 'd' : ''}
+                </div>
+              </div>
+              <div class="bar-val">${a}d</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ─── COST METRICS ───
+function renderCostMetrics(completed) {
+  const dowCosts = [[],[],[],[],[],[],[]];
+  const clientCosts = {};
+
+  completed.forEach(a => {
+    const cost = Number(a.cost) || 0;
+    const d = parseDate(a.apptDate);
+    if (d && !isNaN(d)) dowCosts[d.getDay()].push(cost);
+    const email = (a.email || '').toLowerCase().trim();
+    if (email) {
+      if (!clientCosts[email]) clientCosts[email] = [];
+      clientCosts[email].push(cost);
+    }
+  });
+
+  const clientAvgs = Object.values(clientCosts).map(arr => arr.reduce((s,v)=>s+v,0)/arr.length);
+  const overallClientAvg = clientAvgs.length ? clientAvgs.reduce((s,v)=>s+v,0)/clientAvgs.length : 0;
+  const totalRev = completed.reduce((s,a) => s + (Number(a.cost)||0), 0);
+
+  const maxDowAvg = Math.max(...dowCosts.map(arr => arr.length ? arr.reduce((s,v)=>s+v,0)/arr.length : 0), 1);
+
+  const section = document.getElementById('ops-cost-section');
+  section.innerHTML = `
+    <div class="section-title">Cost Metrics (Completed)</div>
+    <div class="section-body">
+      <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-bottom: 20px;">
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-label">Total Revenue</div>
+          <div class="stat-value">${fmtCurrency(totalRev)}</div>
+        </div>
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-label">Avg Per Appt</div>
+          <div class="stat-value">${fmtCurrency(completed.length ? totalRev/completed.length : 0)}</div>
+        </div>
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-label">Avg Per Client</div>
+          <div class="stat-value">${fmtCurrency(overallClientAvg)}</div>
+        </div>
+      </div>
+      <p style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:12px;">Average Est. Cost by Day of Week</p>
+      <div class="bar-chart">
+        ${DAYS_SHORT.map((day, i) => {
+          const arr = dowCosts[i];
+          const a = arr.length ? arr.reduce((s,v)=>s+v,0)/arr.length : 0;
+          return `
+            <div class="bar-row">
+              <div class="bar-label">${day}</div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${(a/maxDowAvg*100).toFixed(1)}%;background:var(--brand-primary);${a===0?'padding:0;':''}">
+                  ${a > 0 ? fmtCurrency(a) : ''}
+                </div>
+              </div>
+              <div class="bar-val">${fmtCurrency(a)}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ─── CUSTOMER RETENTION ───
+function renderRetention() {
+  // Use ALL appointments (not just filtered) for retention analysis
+  const allCompleted = STATE.appointments.filter(a => a.status && a.status.toString().toLowerCase() === 'completed');
+
+  // Group by customer
+  const custAppts = {};
+  allCompleted.forEach(a => {
+    const email = (a.email || '').toLowerCase().trim();
+    if (!email) return;
+    const d = parseDate(a.apptDate);
+    if (!d || isNaN(d)) return;
+    if (!custAppts[email]) custAppts[email] = [];
+    custAppts[email].push(d);
+  });
+
+  // Sort each customer's appointments
+  Object.values(custAppts).forEach(arr => arr.sort((a,b) => a-b));
+
+  const totalCustomers = Object.keys(custAppts).length;
+  const multiAppt = Object.values(custAppts).filter(arr => arr.length > 1).length;
+
+  // For customers with 2+ appointments, check gap between consecutive appointments
+  let within3 = 0, within6 = 0, within9 = 0, within12 = 0;
+  const customersWithMultiple = Object.values(custAppts).filter(arr => arr.length > 1);
+
+  customersWithMultiple.forEach(dates => {
+    // Check if ANY consecutive pair is within X months from the last appointment
+    const last = dates[dates.length - 1];
+    const secondLast = dates[dates.length - 2];
+    const gapDays = (last - secondLast) / (1000 * 60 * 60 * 24);
+
+    if (gapDays <= 90) within3++;
+    if (gapDays <= 180) within6++;
+    if (gapDays <= 270) within9++;
+    if (gapDays <= 365) within12++;
+  });
+
+  const section = document.getElementById('ops-retention-section');
+  section.innerHTML = `
+    <div class="section-title">Customer Retention</div>
+    <div class="section-body">
+      <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-bottom: 24px;">
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-label">Total Customers</div>
+          <div class="stat-value">${totalCustomers}</div>
+        </div>
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-label">Multi-Visit</div>
+          <div class="stat-value">${fmtPct(totalCustomers ? multiAppt/totalCustomers*100 : 0)}</div>
+          <div class="stat-sub">${multiAppt} customers</div>
+        </div>
+      </div>
+      <p style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:16px;">Return Rate (last visit gap among multi-visit customers)</p>
+      <div class="donut-row">
+        ${[
+          { label: 'Within 3mo', val: customersWithMultiple.length ? within3/customersWithMultiple.length*100 : 0, color: '#22c55e' },
+          { label: 'Within 6mo', val: customersWithMultiple.length ? within6/customersWithMultiple.length*100 : 0, color: '#46A5FC' },
+          { label: 'Within 9mo', val: customersWithMultiple.length ? within9/customersWithMultiple.length*100 : 0, color: '#f59e0b' },
+          { label: 'Within 12mo', val: customersWithMultiple.length ? within12/customersWithMultiple.length*100 : 0, color: '#a855f7' },
+        ].map(d => `
+          <div class="donut-item">
+            <div class="donut-ring" style="background: conic-gradient(${d.color} ${d.val*3.6}deg, #f3f4f6 0deg);">
+              <div style="width:60px;height:60px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;font-size:16px;">
+                ${fmtPct(d.val)}
+              </div>
+            </div>
+            <div class="donut-label">${d.label}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ─── REVENUE / TIME METRICS ───
+function renderRevenueMetrics(completed, allAppts) {
+  // Peak hours
+  const hourCounts = new Array(24).fill(0);
+  completed.forEach(a => {
+    const d = parseDate(a.apptDate);
+    if (d && !isNaN(d)) hourCounts[d.getHours()]++;
+  });
+
+  // Services popularity
+  const svcCounts = {};
+  completed.forEach(a => {
+    parseServices(a.services).forEach(svc => {
+      svcCounts[svc] = (svcCounts[svc] || 0) + 1;
+    });
+  });
+  const topServices = Object.entries(svcCounts).sort((a,b) => b[1]-a[1]).slice(0, 10);
+  const maxSvc = topServices.length ? topServices[0][1] : 1;
+
+  // New vs returning in filtered period
+  const emailFirst = {};
+  STATE.appointments.forEach(a => {
+    const email = (a.email || '').toLowerCase().trim();
+    if (!email) return;
+    const d = parseDate(a.apptDate);
+    if (!d || isNaN(d)) return;
+    if (!emailFirst[email] || d < emailFirst[email]) emailFirst[email] = d;
+  });
+
+  let newInPeriod = 0, returningInPeriod = 0;
+  const startVal = document.getElementById('ops-start').value;
+  const start = startVal ? new Date(startVal + 'T00:00:00') : null;
+  completed.forEach(a => {
+    const email = (a.email || '').toLowerCase().trim();
+    if (!email) return;
+    const first = emailFirst[email];
+    if (start && first >= start) newInPeriod++;
+    else returningInPeriod++;
+  });
+
+  const section = document.getElementById('ops-revenue-section');
+  section.innerHTML = `
+    <div class="section-title">Additional Insights</div>
+    <div class="section-body">
+      <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-bottom: 24px;">
+        <div class="stat-card" style="cursor:default; border-left: 4px solid var(--success);">
+          <div class="stat-label">New Customers</div>
+          <div class="stat-value">${newInPeriod}</div>
+          <div class="stat-sub">First appointment in period</div>
+        </div>
+        <div class="stat-card" style="cursor:default; border-left: 4px solid var(--brand-primary);">
+          <div class="stat-label">Returning</div>
+          <div class="stat-value">${returningInPeriod}</div>
+          <div class="stat-sub">Had prior appointments</div>
+        </div>
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-label">Avg Services / Appt</div>
+          <div class="stat-value">${completed.length ? (Object.values(svcCounts).reduce((s,v)=>s+v,0)/completed.length).toFixed(1) : '—'}</div>
+        </div>
+      </div>
+      <p style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:12px;">Top Services (Completed)</p>
+      <div class="bar-chart">
+        ${topServices.map(([svc, count]) => `
+          <div class="bar-row">
+            <div class="bar-label" style="width:200px;text-align:left;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${svc}">${svc}</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${(count/maxSvc*100).toFixed(1)}%;background:var(--brand-primary-light);">
+                ${count}
+              </div>
+            </div>
+            <div class="bar-val">${count}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ─── TOP 20 CUSTOMERS ───
+let top20Mode = 'services';
+
+function renderTop20(completed) {
+  const custData = {};
+  completed.forEach(a => {
+    const email = (a.email || '').toLowerCase().trim();
+    if (!email) return;
+    if (!custData[email]) custData[email] = { email, apptCount: 0, svcCount: 0 };
+    custData[email].apptCount++;
+    custData[email].svcCount += parseServices(a.services).length;
+  });
+
+  const sorted = Object.values(custData).sort((a,b) =>
+    top20Mode === 'services' ? b.svcCount - a.svcCount : b.apptCount - a.apptCount
+  ).slice(0, 20);
+
+  const section = document.getElementById('ops-top-section');
+  section.innerHTML = `
+    <div class="section-title">
+      <span>Top 20 Customers</span>
+      <div class="toggle-group">
+        <button class="toggle-opt ${top20Mode === 'services' ? 'active' : ''}" onclick="top20Mode='services';runOpsFilter();">By Services</button>
+        <button class="toggle-opt ${top20Mode === 'appointments' ? 'active' : ''}" onclick="top20Mode='appointments';runOpsFilter();">By Appointments</button>
+      </div>
+    </div>
+    <div class="section-body" style="padding:0;">
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>#</th><th>Email</th><th>Appointments</th><th>Services</th></tr></thead>
+          <tbody>
+            ${sorted.map((c, i) => `
+              <tr>
+                <td style="font-weight:600;color:var(--text-muted);">${i+1}</td>
+                <td>${c.email}</td>
+                <td>${c.apptCount}</td>
+                <td>${c.svcCount}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
