@@ -1122,8 +1122,12 @@ function parseDate(val) {
   if (!val) return null;
   if (val instanceof Date) return val;
   const s = val.toString();
-  // ISO format
-  if (s.includes('T')) return new Date(s);
+  // ISO format — parse as local time, not UTC
+  if (s.includes('T')) {
+    const [datePart] = s.split('T');
+    const [y, m, d] = datePart.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
   // M/D/YY or M/D/YYYY
   const parts = s.split('/');
   if (parts.length === 3) {
