@@ -1467,7 +1467,7 @@ function renderStatusRates(appts) {
 
   const total = appts.length;
   const completedN = counts['Completed'] || 0;
-  const cancelledN = (counts['Cancelled'] || 0) + (counts['Canceled'] || 0);
+  const cancelledN = (counts['CustCancel'] || 0) + (counts['Canceled'] || 0);
   const otherN = total - completedN - cancelledN;
 
   const section = document.getElementById('ops-status-section');
