@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DexaFit KC Dashboards</title>
+  <title>DexaFit Dashboards</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
@@ -995,23 +995,31 @@ function submitPassword() {
   const btn = document.getElementById('pw-submit');
   btn.disabled = true;
   btn.textContent = 'Verifying...';
- 
+
   const payload = {
     action: 'verifyDashboardPassword',
     password: pw,
     dashboardType: STATE.dashboardType,
     turnstileToken: STATE.turnstileToken
   };
- 
+  console.log('🔑 Sending password request:', {
+    action: payload.action,
+    dashboardType: payload.dashboardType,
+    passwordLength: pw.length,
+    hasTurnstileToken: !!payload.turnstileToken
+  });
+
   fetch(CONFIG.APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify(payload)
   })
   .then(r => {
+    console.log('🔑 Response status:', r.status);
     return r.json();
   })
   .then(function(result) {
+    console.log('🔑 Full server response:', JSON.stringify(result));
     btn.disabled = false;
     btn.textContent = 'Unlock';
     if (result && result.valid) {
@@ -1027,6 +1035,7 @@ function submitPassword() {
     }
   })
   .catch(function(e) {
+    console.error('🔑 Fetch error:', e);
     btn.disabled = false;
     btn.textContent = 'Unlock';
     const err = document.getElementById('modal-error');
@@ -1113,8 +1122,12 @@ function parseDate(val) {
   if (!val) return null;
   if (val instanceof Date) return val;
   const s = val.toString();
-  // ISO format
-  if (s.includes('T')) return new Date(s);
+  // ISO format — parse as local time, not UTC
+  if (s.includes('T')) {
+    const [datePart] = s.split('T');
+    const [y, m, d] = datePart.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
   // M/D/YY or M/D/YYYY
   const parts = s.split('/');
   if (parts.length === 3) {
@@ -1352,6 +1365,29 @@ function closeDetail() {
   document.getElementById('detail-overlay').classList.add('hidden');
 }
 
+function showOpsDetail(label, appts) {
+  const title = document.getElementById('detail-title');
+  const body = document.getElementById('detail-body');
+  title.textContent = label + ' (' + appts.length + ')';
+
+  let html = '<table><thead><tr><th>Email</th><th>Appt Date</th><th>Services</th><th>Est. Cost</th><th>Status</th><th>Booking Date</th><th>Referrer</th><th>Discount</th></tr></thead><tbody>';
+  appts.forEach(a => {
+    html += '<tr>';
+    html += '<td>' + (a.email || '—') + '</td>';
+    html += '<td>' + fmtDate(a.apptDate) + '</td>';
+    html += '<td style="white-space:normal;max-width:250px;">' + (a.services || '—') + '</td>';
+    html += '<td>' + fmtCurrency(a.cost || 0) + '</td>';
+    html += '<td>' + (a.status || '—') + '</td>';
+    html += '<td>' + fmtDate(a.bookingDate) + '</td>';
+    html += '<td>' + (a.referrer || '—') + '</td>';
+    html += '<td>' + (a.discount || '—') + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  body.innerHTML = html;
+  document.getElementById('detail-overlay').classList.remove('hidden');
+}
+
 // ─── OPERATIONS DASHBOARD LOGIC ───
 function setOpsDateType(type) {
   STATE.opsDateType = type;
@@ -1417,10 +1453,17 @@ function renderOpsContent(appts) {
 // ─── STATUS RATES ───
 function renderStatusRates(appts) {
   const counts = {};
+  const byStatus = {};
   appts.forEach(a => {
     const s = (a.status || 'Unknown').toString().trim();
     counts[s] = (counts[s] || 0) + 1;
+    if (!byStatus[s]) byStatus[s] = [];
+    byStatus[s].push(a);
   });
+
+  // Store for click access
+  window._statusAppts = byStatus;
+  window._allFilteredAppts = appts;
 
   const total = appts.length;
   const completedN = counts['Completed'] || 0;
@@ -1432,26 +1475,27 @@ function renderStatusRates(appts) {
     <div class="section-title">Appointment Status Rates</div>
     <div class="section-body">
       <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
-        <div class="stat-card" style="cursor:default; border-left: 4px solid var(--success);">
+        <div class="stat-card" style="cursor:pointer; border-left: 4px solid var(--success);" onclick="showOpsDetail('Completed', window._statusAppts['Completed']||[])">
           <div class="stat-label">Completed</div>
           <div class="stat-value" style="color:var(--success);">${fmtPct(total ? completedN/total*100 : 0)}</div>
           <div class="stat-sub">${completedN} of ${total}</div>
         </div>
-        <div class="stat-card" style="cursor:default; border-left: 4px solid var(--danger);">
+        <div class="stat-card" style="cursor:pointer; border-left: 4px solid var(--danger);" onclick="showOpsDetail('Cancelled', (window._statusAppts['Cancelled']||[]).concat(window._statusAppts['Canceled']||[]))">
           <div class="stat-label">Cancelled</div>
           <div class="stat-value" style="color:var(--danger);">${fmtPct(total ? cancelledN/total*100 : 0)}</div>
           <div class="stat-sub">${cancelledN} of ${total}</div>
         </div>
-        <div class="stat-card" style="cursor:default; border-left: 4px solid var(--warning);">
+        <div class="stat-card" style="cursor:pointer; border-left: 4px solid var(--warning);" onclick="showOpsDetail('Other Statuses', window._allFilteredAppts.filter(a=>{const s=(a.status||'').trim();return s!=='Completed'&&s!=='Cancelled'&&s!=='Canceled';}))">
           <div class="stat-label">Other</div>
           <div class="stat-value" style="color:var(--warning);">${fmtPct(total ? otherN/total*100 : 0)}</div>
           <div class="stat-sub">${otherN} of ${total}</div>
         </div>
       </div>
       <div style="margin-top:16px;">
-        <table><thead><tr><th>Status</th><th>Count</th><th>%</th></tr></thead><tbody>
+        <table><thead><tr><th>Status</th><th>Count</th><th>%</th><th></th></tr></thead><tbody>
         ${Object.entries(counts).sort((a,b) => b[1]-a[1]).map(([s,c]) =>
-          `<tr><td>${s}</td><td>${c}</td><td>${fmtPct(total ? c/total*100 : 0)}</td></tr>`
+          `<tr style="cursor:pointer;" onclick="showOpsDetail('${s.replace(/'/g,"\\'")}', window._statusAppts['${s.replace(/'/g,"\\'")}']||[])">
+            <td>${s}</td><td>${c}</td><td>${fmtPct(total ? c/total*100 : 0)}</td><td style="color:var(--brand-primary);font-size:11px;">View →</td></tr>`
         ).join('')}
         </tbody></table>
       </div>
@@ -1462,11 +1506,18 @@ function renderStatusRates(appts) {
 // ─── APPT BY DOW ───
 function renderApptByDow(appts) {
   const dowCounts = [0,0,0,0,0,0,0];
+  const dowAppts = [[],[],[],[],[],[],[]];
   appts.forEach(a => {
     const d = parseDate(a.apptDate);
-    if (d && !isNaN(d)) dowCounts[d.getDay()]++;
+    if (d && !isNaN(d)) {
+      dowCounts[d.getDay()]++;
+      dowAppts[d.getDay()].push(a);
+    }
   });
   const max = Math.max(...dowCounts, 1);
+
+  // Store for click access
+  window._dowAppts = dowAppts;
 
   const section = document.getElementById('ops-dow-section');
   section.innerHTML = `
@@ -1474,7 +1525,7 @@ function renderApptByDow(appts) {
     <div class="section-body">
       <div class="bar-chart">
         ${DAYS_SHORT.map((day, i) => `
-          <div class="bar-row">
+          <div class="bar-row" style="cursor:pointer;" onclick="showOpsDetail('${DAYS[i]} Appointments', window._dowAppts[${i}])">
             <div class="bar-label">${day}</div>
             <div class="bar-track">
               <div class="bar-fill" style="width:${(dowCounts[i]/max*100).toFixed(1)}%;${dowCounts[i]===0?'padding:0;':''}">
@@ -1643,64 +1694,96 @@ function renderCostMetrics(completed) {
 
 // ─── CUSTOMER RETENTION ───
 function renderRetention(filteredAppts) {
-  const validStatuses = ['completed', 'imported'];
-  const validInRange = filteredAppts.filter(a => a.status && validStatuses.includes(a.status.toString().toLowerCase()));
+  // Include Completed only as valid status for retention (Imported should still complete)
+  const validStatus = s => {
+    const lower = (s || '').toString().toLowerCase();
+    return lower === 'completed';
+  };
 
-  // Group by customer
-  const custAppts = {};
+  // Use filtered appointments (respects date range) for retention analysis
+  const validInRange = filteredAppts.filter(a => validStatus(a.status));
+
+  // Group by customer — within date range
+  const custApptsInRange = {};
   validInRange.forEach(a => {
     const email = (a.email || '').toLowerCase().trim();
     if (!email) return;
     const d = parseDate(a.apptDate);
     if (!d || isNaN(d)) return;
-    if (!custAppts[email]) custAppts[email] = [];
-    custAppts[email].push(d);
+    if (!custApptsInRange[email]) custApptsInRange[email] = [];
+    custApptsInRange[email].push({ date: d, appt: a });
   });
 
-  // Sort each customer's appointments
-  Object.values(custAppts).forEach(arr => arr.sort((a,b) => a-b));
+  // Also build ALL-TIME history for each customer (for return-gap donuts)
+  const custApptsAllTime = {};
+  STATE.appointments.filter(a => validStatus(a.status)).forEach(a => {
+    const email = (a.email || '').toLowerCase().trim();
+    if (!email) return;
+    const d = parseDate(a.apptDate);
+    if (!d || isNaN(d)) return;
+    if (!custApptsAllTime[email]) custApptsAllTime[email] = [];
+    custApptsAllTime[email].push(d);
+  });
+  Object.values(custApptsAllTime).forEach(arr => arr.sort((a,b) => a-b));
 
-  const totalCustomers = Object.keys(custAppts).length;
-  const multiAppt = Object.values(custAppts).filter(arr => arr.length > 1).length;
+  const totalCustomers = Object.keys(custApptsInRange).length;
+  // Multi-visit: customers in range who have >1 appointment ALL-TIME
+  const multiApptList = Object.keys(custApptsInRange).filter(email => 
+    custApptsAllTime[email] && custApptsAllTime[email].length > 1
+  );
+  const multiAppt = multiApptList.length;
 
-  // For customers with 2+ appointments, check gap between consecutive appointments
+  // Return-gap donuts: among multi-visit customers in range, check their last gap all-time
   let within3 = 0, within6 = 0, within9 = 0, within12 = 0;
-  const customersWithMultiple = Object.values(custAppts).filter(arr => arr.length > 1);
-
-  customersWithMultiple.forEach(dates => {
-    // Check if ANY consecutive pair is within X months from the last appointment
+  multiApptList.forEach(email => {
+    const dates = custApptsAllTime[email];
     const last = dates[dates.length - 1];
     const secondLast = dates[dates.length - 2];
     const gapDays = (last - secondLast) / (1000 * 60 * 60 * 24);
-
     if (gapDays <= 90) within3++;
     if (gapDays <= 180) within6++;
     if (gapDays <= 270) within9++;
     if (gapDays <= 365) within12++;
   });
 
+  // Store for click detail
+  window._retentionData = {
+    allCustomers: Object.keys(custApptsInRange),
+    multiApptList: multiApptList,
+    singleVisitList: Object.keys(custApptsInRange).filter(email =>
+      !custApptsAllTime[email] || custApptsAllTime[email].length <= 1
+    ),
+    custApptsAllTime: custApptsAllTime
+  };
+
   const section = document.getElementById('ops-retention-section');
   section.innerHTML = `
     <div class="section-title">Customer Retention</div>
     <div class="section-body">
       <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-bottom: 24px;">
-        <div class="stat-card" style="cursor:default;">
-          <div class="stat-label">Total Customers</div>
+        <div class="stat-card" onclick="showRetentionDetail('total')" style="cursor:pointer;">
+          <div class="stat-label">Unique Customers</div>
           <div class="stat-value">${totalCustomers}</div>
+          <div class="stat-sub">In date range (Completed)</div>
         </div>
-        <div class="stat-card" style="cursor:default;">
+        <div class="stat-card" onclick="showRetentionDetail('multi')" style="cursor:pointer;">
           <div class="stat-label">Multi-Visit</div>
           <div class="stat-value">${fmtPct(totalCustomers ? multiAppt/totalCustomers*100 : 0)}</div>
-          <div class="stat-sub">${multiAppt} customers</div>
+          <div class="stat-sub">${multiAppt} of ${totalCustomers} customers</div>
+        </div>
+        <div class="stat-card" onclick="showRetentionDetail('single')" style="cursor:pointer;">
+          <div class="stat-label">Single-Visit</div>
+          <div class="stat-value">${fmtPct(totalCustomers ? (totalCustomers - multiAppt)/totalCustomers*100 : 0)}</div>
+          <div class="stat-sub">${totalCustomers - multiAppt} customers</div>
         </div>
       </div>
       <p style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:16px;">Return Rate (last visit gap among multi-visit customers)</p>
       <div class="donut-row">
         ${[
-          { label: 'Within 3mo', val: customersWithMultiple.length ? within3/customersWithMultiple.length*100 : 0, color: '#22c55e' },
-          { label: 'Within 6mo', val: customersWithMultiple.length ? within6/customersWithMultiple.length*100 : 0, color: '#46A5FC' },
-          { label: 'Within 9mo', val: customersWithMultiple.length ? within9/customersWithMultiple.length*100 : 0, color: '#f59e0b' },
-          { label: 'Within 12mo', val: customersWithMultiple.length ? within12/customersWithMultiple.length*100 : 0, color: '#a855f7' },
+          { label: 'Within 3mo', val: multiAppt ? within3/multiAppt*100 : 0, color: '#22c55e' },
+          { label: 'Within 6mo', val: multiAppt ? within6/multiAppt*100 : 0, color: '#46A5FC' },
+          { label: 'Within 9mo', val: multiAppt ? within9/multiAppt*100 : 0, color: '#f59e0b' },
+          { label: 'Within 12mo', val: multiAppt ? within12/multiAppt*100 : 0, color: '#a855f7' },
         ].map(d => `
           <div class="donut-item">
             <div class="donut-ring" style="background: conic-gradient(${d.color} ${d.val*3.6}deg, #f3f4f6 0deg);">
@@ -1714,6 +1797,36 @@ function renderRetention(filteredAppts) {
       </div>
     </div>
   `;
+}
+
+function showRetentionDetail(type) {
+  const rd = window._retentionData;
+  if (!rd) return;
+  let emails, label;
+  if (type === 'total') { emails = rd.allCustomers; label = 'All Unique Customers'; }
+  else if (type === 'multi') { emails = rd.multiApptList; label = 'Multi-Visit Customers'; }
+  else { emails = rd.singleVisitList; label = 'Single-Visit Customers'; }
+
+  const title = document.getElementById('detail-title');
+  const body = document.getElementById('detail-body');
+  title.textContent = label + ' (' + emails.length + ')';
+
+  let html = '<table><thead><tr><th>Email</th><th>All-Time Visits</th><th>First Visit</th><th>Last Visit</th><th>Last Gap (days)</th></tr></thead><tbody>';
+  emails.sort((a,b) => {
+    const aLen = (rd.custApptsAllTime[a] || []).length;
+    const bLen = (rd.custApptsAllTime[b] || []).length;
+    return bLen - aLen;
+  }).forEach(email => {
+    const dates = rd.custApptsAllTime[email] || [];
+    const visits = dates.length;
+    const first = dates.length ? fmtDate(dates[0]) : '—';
+    const last = dates.length ? fmtDate(dates[dates.length - 1]) : '—';
+    const gap = dates.length > 1 ? Math.round((dates[dates.length-1] - dates[dates.length-2]) / (1000*60*60*24)) : '—';
+    html += `<tr><td>${email}</td><td>${visits}</td><td>${first}</td><td>${last}</td><td>${gap}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  body.innerHTML = html;
+  document.getElementById('detail-overlay').classList.remove('hidden');
 }
 
 // ─── REVENUE / TIME METRICS ───
@@ -1758,16 +1871,16 @@ function renderRevenueMetrics(completed, allAppts) {
 
   const section = document.getElementById('ops-revenue-section');
   section.innerHTML = `
-    <div class="section-title">Additional Insights</div>
+    <div class="section-title">Additional Insights (DATA FOR 03/01/2026 ONWARD)</div>
     <div class="section-body">
       <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-bottom: 24px;">
         <div class="stat-card" style="cursor:default; border-left: 4px solid var(--success);">
-          <div class="stat-label">New Customers</div>
+          <div class="stat-label">New Customer Appts</div>
           <div class="stat-value">${newInPeriod}</div>
           <div class="stat-sub">First appointment in period</div>
         </div>
         <div class="stat-card" style="cursor:default; border-left: 4px solid var(--brand-primary);">
-          <div class="stat-label">Returning</div>
+          <div class="stat-label">Returning Customer Appts</div>
           <div class="stat-value">${returningInPeriod}</div>
           <div class="stat-sub">Had prior appointments</div>
         </div>
