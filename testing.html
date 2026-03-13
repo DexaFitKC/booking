@@ -1694,10 +1694,10 @@ function renderCostMetrics(completed) {
 
 // ─── CUSTOMER RETENTION ───
 function renderRetention(filteredAppts) {
-  // Include Completed AND Imported as valid statuses for retention
+  // Include Completed only as valid status for retention (Imported should still complete)
   const validStatus = s => {
     const lower = (s || '').toString().toLowerCase();
-    return lower === 'completed' || lower === 'imported';
+    return lower === 'completed';
   };
 
   // Use filtered appointments (respects date range) for retention analysis
@@ -1764,7 +1764,7 @@ function renderRetention(filteredAppts) {
         <div class="stat-card" onclick="showRetentionDetail('total')" style="cursor:pointer;">
           <div class="stat-label">Unique Customers</div>
           <div class="stat-value">${totalCustomers}</div>
-          <div class="stat-sub">In date range (Completed + Imported)</div>
+          <div class="stat-sub">In date range (Completed)</div>
         </div>
         <div class="stat-card" onclick="showRetentionDetail('multi')" style="cursor:pointer;">
           <div class="stat-label">Multi-Visit</div>
