@@ -1422,7 +1422,6 @@ function runOpsFilter() {
 
 function renderOpsContent(appts) {
   const completed = appts.filter(a => a.status && a.status.toString().toLowerCase() === 'completed');
-  const completeimport = appts.filter(a => ['completed', 'imported'].includes(a.status?.toString().toLowerCase()));
 
   // ─── 1. Status Rates ───
   renderStatusRates(appts);
@@ -1431,19 +1430,19 @@ function renderOpsContent(appts) {
   renderApptByDow(appts);
 
   // ─── 3. Service Count by Service by DOW ───
-  renderServiceByDow(completeimported);
+  renderServiceByDow(completed);
 
   // ─── 4. Average Lead Time ───
   renderLeadTime(appts);
 
   // ─── 5. Average Cost by DOW and Per Client ───
-  renderCostMetrics(completeimported);
+  renderCostMetrics(completed);
 
   // ─── 6. Customer Retention ───
   renderRetention(appts);
 
   // ─── 7. Revenue / Time Metrics ───
-  renderRevenueMetrics(completeimported, appts);
+  renderRevenueMetrics(completed, appts);
 
   // ─── 8. Top 20 Customers ───
   renderTop20(completed);
@@ -1468,7 +1467,7 @@ function renderStatusRates(appts) {
 
   const total = appts.length;
   const completedN = counts['Completed'] || 0;
-  const cancelledN = (counts['CustCancel'] || 0) + (counts['Canceled'] || 0);
+  const cancelledN = (counts['Cancelled'] || 0) + (counts['Canceled'] || 0);
   const otherN = total - completedN - cancelledN;
 
   const section = document.getElementById('ops-status-section');
