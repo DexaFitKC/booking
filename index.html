@@ -348,7 +348,7 @@
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        @media (prefers-reduced-motion: reduce) {
+        @media (pers-reduced-motion: reduce) {
             *, *::before, *::after {
                 animation-duration: 0.01ms !important;
                 animation-iteration-count: 1 !important;
@@ -435,7 +435,7 @@
             console.error("JS Error:", message, "Line:", lineno);
             // Only show alert for real app errors, not third-party scripts
             if (source && source.includes(window.location.hostname)) {
-                alert("Something went wrong. Please refresh and try again.");
+                alert("Something went wrong. Please resh and try again.");
             }
             return true;
         };
@@ -2604,34 +2604,31 @@
         function submitBooking(e) {
             e.preventDefault();
             const btn = e.target.querySelector('button[type="submit"]');
-
-            // Extract referrer from URL
+         
+            // Extract referrer and fbclid from URL
             const urlParams = new URLSearchParams(window.location.search);
             const referrer = urlParams.get('ref') || '';
+            const fbclid = urlParams.get('fbclid') || '';
             
             // STOP DOUBLE CLICKS
             if (btn.disabled) return; 
             
-            // ============================================
             // MANUAL VALIDATION FOR REQUIRED CHECKBOXES
-            // ============================================
-            // Select all required checkboxes that are NOT checked
             const requiredCheckboxes = document.querySelectorAll('#questions-container input[type="checkbox"][required]');
             let allChecked = true;
             
             requiredCheckboxes.forEach(cb => {
                 if (!cb.checked) {
                     allChecked = false;
-                    // Optional: Highlight the parent label to show error
                     cb.closest('.question-item').style.border = "2px solid red";
                 } else {
                     cb.closest('.question-item').style.border = "none";
                 }
             });
-        
+         
             if (!allChecked) {
                 alert("Please check all required boxes before booking.");
-                return; // Stop submission
+                return;
             }
             
             btn.disabled = true;
@@ -2641,7 +2638,7 @@
             const formData = new FormData(e.target);
             const customerData = {};
             const questionResponses = {};
-        
+         
             // Logic for Existing vs New
             if (state.existingCustomer) {
                 const hwChanged = formData.get('hw-changed') === 'yes';
@@ -2660,14 +2657,13 @@
                 customerData.weight = formData.get('weightNew');
                 customerData.ethnicity = formData.get('ethnicity');
             }
-        
+         
             // Get question responses
             for (const [key, value] of formData.entries()) {
-                // Exclude non-question fields
                 if (['hw-changed', 'fullName', 'phone', 'dob', 'sex', 'heightNew', 'weightNew', 'ethnicity', 'height', 'weight'].includes(key)) continue;
                 if (value) questionResponses[key] = value;
             }
-        
+         
             const bookingData = {
                 customerEmail: state.customerEmail,
                 customerData,
@@ -2678,13 +2674,28 @@
                 duration: state.totalDuration,
                 price: state.totalPrice,
                 questionResponses,
-                referrer
+                referrer,
+                fbclid
             };
-        
+         
             callAppsScript('createBooking', bookingData)
                 .then(response => {
                     if (response.success) {
-                        window.location.href = 'https://dexafitkc.com/success';
+                        // dataLayer.push — fires BEFORE redirect
+                        window.dataLayer = window.dataLayer || [];
+                        dataLayer.push({
+                            event:          'BookingComplete',
+                            bookingEmail:   response.email,
+                            bookingName:    response.name,
+                            bookingService: response.service,
+                            bookingValue:   response.value,
+                            bookingId:      response.bookingId
+                        });
+         
+                        // Small delay so GTM processes the push before navigation
+                        setTimeout(function () {
+                            window.location.href = 'https://dexafitkc.com/success';
+                        }, 500);
                     } else {
                         throw new Error(response.error || "Booking failed");
                     }
