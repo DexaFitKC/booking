@@ -4117,15 +4117,31 @@
             
             const bundleSavings = originalTotal - bundleTotal;
 
-            // 3. Calculate Credit Savings
-            let creditSavings = 0;
-            Object.entries(state.checkoutCreditsUsed).forEach(([idx, creditId]) => {
-                const s = services[idx];
-                const c = state.checkoutAvailableCredits.find(x => x.id == creditId);
-                if (s && c && c.name.toLowerCase() === s.name.toLowerCase()) {
-                    creditSavings += (s.price || 0);
-                }
-            });
+            // 3. Calculate Credit Savings (use effective bundled price, not base price)
+                let creditSavings = 0;
+                Object.entries(state.checkoutCreditsUsed).forEach(([idx, creditId]) => {
+                    const s = services[idx];
+                    const c = state.checkoutAvailableCredits.find(x => x.id == creditId);
+                    if (s && c && c.name.toLowerCase() === s.name.toLowerCase()) {
+                        const basePrice = parseFloat(s.price) || 0;
+                        const addonPrice = (s.addonPrice !== undefined && s.addonPrice !== null)
+                            ? parseFloat(s.addonPrice)
+                            : basePrice;
+                        const isClassA = (s.id && CLASS_A_IDS.includes(s.id)) ||
+                                         ((s.name || '').toLowerCase().includes('dexa') ||
+                                          (s.name || '').toLowerCase().includes('rmr') ||
+                                          (s.name || '').toLowerCase().includes('vo2'));
+                
+                        let effectivePrice = basePrice;
+                        if (countA >= 2) {
+                            effectivePrice = addonPrice;
+                        } else if (countA === 1) {
+                            effectivePrice = isClassA ? basePrice : addonPrice;
+                        }
+                
+                        creditSavings += effectivePrice;
+                    }
+                });
 
             // 4. Calculate GC Savings
             let gcSavings = 0;
