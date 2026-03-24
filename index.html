@@ -2609,6 +2609,7 @@
             // Extract referrer and fbclid from URL
             const urlParams = new URLSearchParams(window.location.search);
             const referrer = urlParams.get('ref') || '';
+            const utmcont = urlParams.get('utm_content') || '';
             const fbclid = urlParams.get('fbclid') || '';
             
             // STOP DOUBLE CLICKS
@@ -2676,6 +2677,7 @@
                 price: state.totalPrice,
                 questionResponses,
                 referrer,
+                utmcont,
                 fbclid
             };
          
