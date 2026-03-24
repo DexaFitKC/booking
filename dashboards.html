@@ -807,6 +807,7 @@
     <div class="mktg-subnav">
       <button class="btn btn-secondary active" id="btn-referrer" onclick="setMktgMode('referrer')">Referrer Tracking</button>
       <button class="btn btn-secondary" id="btn-discount" onclick="setMktgMode('discount')">Discount Tracking</button>
+      <button class="btn btn-secondary" id="btn-utmcont" onclick="setMktgMode('utmcont')">UTM Content</button>
     </div>
 
     <!-- Filters -->
@@ -836,6 +837,10 @@
           <select id="mktg-discount">
             <option value="" disabled selected>Select a discount</option>
           </select>
+        </div>
+        <div class="filter-group grow hidden" id="mktg-utmcont-group">
+          <label>UTM Content</label>
+          <input type="text" id="mktg-utmcont" placeholder="Enter UTM content value">
         </div>
         <div class="filter-group">
           <label>&nbsp;</label>
@@ -1185,8 +1190,10 @@ function setMktgMode(mode) {
   STATE.mktgMode = mode;
   document.getElementById('btn-referrer').classList.toggle('active', mode === 'referrer');
   document.getElementById('btn-discount').classList.toggle('active', mode === 'discount');
+  document.getElementById('btn-utmcont').classList.toggle('active', mode === 'utmcont');
   document.getElementById('mktg-referrer-group').classList.toggle('hidden', mode !== 'referrer');
   document.getElementById('mktg-discount-group').classList.toggle('hidden', mode !== 'discount');
+  document.getElementById('mktg-utmcont-group').classList.toggle('hidden', mode !== 'utmcont');
   // Clear previous results
   document.getElementById('mktg-stats').classList.add('hidden');
   document.getElementById('mktg-empty').classList.add('hidden');
@@ -1208,6 +1215,9 @@ function runMktgFilter() {
   if (STATE.mktgMode === 'referrer') {
     filterVal = document.getElementById('mktg-referrer').value.trim();
     if (!filterVal) { alert('Please enter a referrer.'); return; }
+  } else if (STATE.mktgMode === 'utmcont') {
+  filterVal = document.getElementById('mktg-utmcont').value.trim();
+  if (!filterVal) { alert('Please enter a UTM content value.'); return; }
   } else {
     filterVal = document.getElementById('mktg-discount').value;
     if (!filterVal) { alert('Please select a discount.'); return; }
@@ -1218,6 +1228,8 @@ function runMktgFilter() {
     // Match referrer or discount
     if (STATE.mktgMode === 'referrer') {
       if (!a.referrer || a.referrer.toString().toLowerCase().indexOf(filterVal.toLowerCase()) === -1) return false;
+    } else if (STATE.mktgMode === 'utmcont') {
+      if (!a.utmcont || a.utmcont.toString().toLowerCase().indexOf(filterVal.toLowerCase()) === -1) return false;
     } else {
       if (!a.discount || a.discount.toString() !== filterVal) return false;
     }
