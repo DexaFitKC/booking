@@ -527,14 +527,13 @@
     }
     
     async function sb_getAppointments(dateStr) {
-        const targetDate = new Date(dateStr);
-        // Format to match stored format (M/d/yy or similar)
-        const month = targetDate.getMonth() + 1;
-        const day = targetDate.getDate();
-        const year = targetDate.getFullYear() % 100;
-        // Try multiple date formats since appt_date is stored as text
-        const fmt1 = `${month}/${day}/${year}`;
-        const fmt2 = `${month}/${day}/20${year}`;
+        // Parse directly from "YYYY-MM-DD" string to avoid UTC shift
+            const parts = dateStr.split('-');
+            const month = parseInt(parts[1]);
+            const day = parseInt(parts[2]);
+            const year = parseInt(parts[0]) % 100;
+            const fmt1 = `${month}/${day}/${year}`;
+            const fmt2 = `${month}/${day}/20${year}`;
         const rows = await sbQuery(
             `appointment_log?or=(appt_date.eq.${encodeURIComponent(fmt1)},appt_date.eq.${encodeURIComponent(fmt2)})&status=in.(Completed,Accepted,Scheduled,Confirmed,Imported)&order=time.asc`
         );
