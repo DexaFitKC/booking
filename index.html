@@ -441,6 +441,180 @@
         };
     </script>
 
+  <script>
+    // ============================================
+    // SUPABASE CONFIG
+    // ============================================
+    const SUPABASE_URL = 'https://einvwopnfhjbydfumwzm.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpbnZ3b3BuZmhqYnlkZnVtd3ptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MjkwNDAsImV4cCI6MjA5MDIwNTA0MH0.AyJZ4_NNZs6i5_4hUtVl_KNf9JSl-b9ohxf343U61Xc';
+    
+    async function sbQuery(path) {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Accept': 'application/json'
+            }
+        });
+        if (!res.ok) throw new Error(`Supabase error: ${res.status}`);
+        const text = await res.text();
+        return text ? JSON.parse(text) : [];
+    }
+    
+    // ============================================
+    // SUPABASE DATA FUNCTIONS (replace callAppsScript for reads)
+    // ============================================
+    
+    async function sb_checkCustomer(email) {
+        const rows = await sbQuery(`customers?email=ilike.${encodeURIComponent(email)}&limit=1`);
+        if (rows.length === 0) return { exists: false };
+        const c = rows[0];
+        const customer = {
+            id: c.id, email: c.email, fullName: c.full_name,
+            phone: c.phone, sex: c.sex, dob: c.dob,
+            height: c.height, weight: c.weight, ethnicity: c.ethnicity, notes: c.notes
+        };
+        const creditsData = await sb_getCreditsForEmail(email);
+        return { exists: true, customer, credits: creditsData.credits, giftCards: creditsData.giftCards };
+    }
+    
+    async function sb_getCreditsForEmail(email) {
+        const rows = await sbQuery(
+            `credits_and_gift_cards?customer_email=ilike.${encodeURIComponent(email)}&used=lt.1&order=id.desc`
+        );
+        const now = new Date();
+        const credits = [], giftCards = [];
+        rows.forEach(r => {
+            if (r.expiration && new Date(r.expiration) < now) return;
+            if (r.value <= 0) return;
+            const item = {
+                id: r.id, customerEmail: r.customer_email, customerName: r.customer_name,
+                date: r.date, name: r.name, value: r.value, expiration: r.expiration, used: r.used
+            };
+            const nameLower = String(r.name).toLowerCase();
+            if (nameLower === 'gc' || nameLower.includes('gift card')) giftCards.push(item);
+            else credits.push(item);
+        });
+        return { credits, giftCards };
+    }
+    
+    async function sb_getCustomers(page, searchQuery) {
+        const limit = 20;
+        const offset = (page || 0) * limit;
+        let path = `customers?order=id.desc&limit=${limit}&offset=${offset}`;
+        if (searchQuery) {
+            const q = encodeURIComponent(`%${searchQuery}%`);
+            path = `customers?or=(full_name.ilike.${q},email.ilike.${q},phone.ilike.${q})&order=id.desc&limit=${limit}&offset=${offset}`;
+        }
+        // Use HEAD to get total count for hasMore
+        const rows = await sbQuery(path);
+        const customers = rows.map(r => ({
+            id: r.id, email: r.email, fullName: r.full_name,
+            phone: r.phone, sex: r.sex, dob: r.dob,
+            height: r.height, weight: r.weight, ethnicity: r.ethnicity, notes: r.notes
+        }));
+        return { customers, hasMore: rows.length === limit };
+    }
+    
+    async function sb_getCustomerHistory(customerId) {
+        const rows = await sbQuery(`appointment_log?customer_id=eq.${customerId}&order=appt_date.desc`);
+        const history = rows.map(r => ({
+            date: r.appt_date || '', time: r.time || '',
+            services: r.service_name || '', price: r.est_cost || 0,
+            status: r.status || 'Scheduled'
+        }));
+        return { history };
+    }
+    
+    async function sb_getAppointments(dateStr) {
+        const targetDate = new Date(dateStr);
+        // Format to match stored format (M/d/yy or similar)
+        const month = targetDate.getMonth() + 1;
+        const day = targetDate.getDate();
+        const year = targetDate.getFullYear() % 100;
+        // Try multiple date formats since appt_date is stored as text
+        const fmt1 = `${month}/${day}/${year}`;
+        const fmt2 = `${month}/${day}/20${year}`;
+        const rows = await sbQuery(
+            `appointment_log?or=(appt_date.eq.${encodeURIComponent(fmt1)},appt_date.eq.${encodeURIComponent(fmt2)})&status=in.(Completed,Accepted,Scheduled,Confirmed,Imported)&order=time.asc`
+        );
+    
+        const appointments = rows.map(r => ({
+            id: r.id, customerId: r.customer_id, email: r.customer_email, name: r.customer_name,
+            service: r.service_name, price: parseFloat(r.est_cost) || 0,
+            time: r.time, status: r.status
+        }));
+        return { appointments };
+    }
+    
+    async function sb_getCheckoutData(emails) {
+        const now = new Date();
+        const credits = [], giftCards = [];
+        for (const email of emails) {
+            const data = await sb_getCreditsForEmail(email);
+            credits.push(...data.credits);
+            giftCards.push(...data.giftCards);
+        }
+        return { credits, giftCards };
+    }
+    
+    async function sb_getCreditManagement(page, searchQuery) {
+        const limit = 20;
+        const offset = (page || 0) * limit;
+        const now = new Date();
+        let path = `credits_and_gift_cards?order=id.desc&limit=${limit}&offset=${offset}`;
+        if (searchQuery) {
+            const q = encodeURIComponent(`%${searchQuery}%`);
+            path = `credits_and_gift_cards?or=(customer_name.ilike.${q},customer_email.ilike.${q},name.ilike.${q})&order=id.desc&limit=${limit}&offset=${offset}`;
+        }
+        const rows = await sbQuery(path);
+        const items = rows.map(r => {
+            const exp = r.expiration ? new Date(r.expiration) : null;
+            let status = 'Active';
+            if (r.used >= 1) status = 'Used';
+            else if (exp && exp < now) status = 'Expired';
+            return {
+                row: r.id, id: r.id, email: r.customer_email, name: r.customer_name,
+                date: r.date, itemName: r.name, value: r.value,
+                expiration: r.expiration, used: r.used, status
+            };
+        });
+        return { items, hasMore: rows.length === limit };
+    }
+    
+    async function sb_getPackages() {
+        const rows = await sbQuery('packages?active=eq.true&order=id.asc');
+        const packages = rows.map(r => ({
+            id: r.id, name: r.name, type: r.type,
+            priceId: r.stripe_price_id, description: r.description,
+            credits: r.credits, price: r.price || '-'
+        }));
+        return { packages };
+    }
+    
+    async function sb_getDiscounts() {
+        const rows = await sbQuery('discounts?order=id.asc');
+        const now = new Date();
+        const discounts = rows.filter(r => r.code).map(r => {
+            let isExpired = false;
+            if (r.expiration && new Date(r.expiration) < now) isExpired = true;
+            return {
+                id: r.id, name: r.name, type: r.type, code: r.code,
+                value: r.value, expiration: r.expiration, isExpired
+            };
+        });
+        return { discounts };
+    }
+    
+    async function sb_validateDiscount(code) {
+        const rows = await sbQuery(`discounts?code=eq.${encodeURIComponent(code)}&limit=1`);
+        if (rows.length === 0) return { valid: false, reason: "Invalid code" };
+        const r = rows[0];
+        if (r.expiration && new Date(r.expiration) < new Date()) return { valid: false, reason: "Expired" };
+        return { valid: true, discount: { id: r.id, name: r.name, type: r.type, code: r.code, value: r.value } };
+    }
+  </script>
+
     <!-- Main App Container -->
     <div id="app">
 
@@ -1258,61 +1432,6 @@
             </div>
         </div>
     </div>
-    <!-- Service Modal -->
-    <div id="service-modal" class="fixed inset-0 z-50 hidden">
-        <div class="modal-overlay absolute inset-0" onclick="closeServiceModal()"></div>
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="modal-content glass-card rounded-3xl p-8 w-full max-w-2xl relative z-10 max-h-[90vh] overflow-y-auto">
-                <div class="flex items-center justify-between mb-6">
-                    <h2 id="service-modal-title" class="text-2xl font-bold">Add Service</h2>
-                    <button onclick="closeServiceModal()" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-                <form id="service-form" onsubmit="saveService(event)">
-                    <input type="hidden" id="service-id">
-                    <div class="grid md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Service Name *</label>
-                            <input type="text" id="service-name" class="input-field w-full px-4 py-3 rounded-xl" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Duration (minutes) *</label>
-                            <input type="number" id="service-duration" class="input-field w-full px-4 py-3 rounded-xl" required>
-                        </div>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-                        <textarea id="service-description" class="input-field w-full px-4 py-3 rounded-xl" rows="3"></textarea>
-                    </div>
-                    <div class="grid md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Price ($) *</label>
-                            <input type="number" step="0.01" id="service-price" class="input-field w-full px-4 py-3 rounded-xl" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Add-on Price ($)</label>
-                            <input type="number" step="0.01" id="service-addon-price" class="input-field w-full px-4 py-3 rounded-xl">
-                        </div>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Add-on Duration (minutes)</label>
-                        <input type="number" id="service-addon-duration" class="input-field w-full px-4 py-3 rounded-xl">
-                    </div>
-                    <div class="mb-6">
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Excluded Questions (comma-separated IDs)</label>
-                        <input type="text" id="service-excluded-questions" class="input-field w-full px-4 py-3 rounded-xl" placeholder="e.g., 1,3,5">
-                    </div>
-                    <div class="flex gap-4">
-                        <button type="button" onclick="closeServiceModal()" class="btn-secondary flex-1 py-3 rounded-xl font-semibold">Cancel</button>
-                        <button type="submit" class="btn-primary flex-1 py-3 rounded-xl font-semibold">Save Service</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
 
     <!-- Customer Modal -->
     <div id="customer-modal" class="fixed inset-0 z-50 hidden">
@@ -1397,93 +1516,6 @@
                         <button type="button" onclick="closeCustomerModal()" class="btn-secondary flex-1 py-3 rounded-xl font-semibold">Cancel</button>
                         <button type="submit" class="btn-primary flex-1 py-3 rounded-xl font-semibold">Save Customer</button>
                         <button type="button" onclick="saveAndBook()" class="py-3 px-4 rounded-xl font-semibold text-white" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); box-shadow: 0 4px 15px rgba(34,197,94,0.3);">Save & Book</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Question Change Modal -->
-    <div id="question-change-modal" class="fixed inset-0 z-50 hidden">
-        <div class="modal-overlay absolute inset-0" onclick="closeQuestionChangeModal()"></div>
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="modal-content glass-card rounded-3xl p-8 w-full max-w-md relative z-10">
-                <h2 class="text-xl font-bold mb-4">Has this changed?</h2>
-                <p id="question-change-text" class="text-gray-600 mb-6"></p>
-                <div class="flex gap-4">
-                    <button onclick="answerQuestionChange(false)" class="btn-secondary flex-1 py-3 rounded-xl font-semibold">No, skip</button>
-                    <button onclick="answerQuestionChange(true)" class="btn-primary flex-1 py-3 rounded-xl font-semibold">Yes, update</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Question Modal -->
-    <div id="question-modal" class="fixed inset-0 z-50 hidden">
-        <div class="modal-overlay absolute inset-0" onclick="closeQuestionModal()"></div>
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="modal-content glass-card rounded-3xl p-8 w-full max-w-lg relative z-10">
-                <h2 id="question-modal-title" class="text-2xl font-bold mb-6">Add Question</h2>
-                <form id="question-form" onsubmit="saveQuestionData(event)">
-                    <input type="hidden" id="question-id">
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold mb-2">Question Text</label>
-                        <input type="text" id="question-text" class="input-field w-full px-4 py-3 rounded-xl" required>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Type</label>
-                            <select id="question-type" class="input-field w-full px-4 py-3 rounded-xl">
-                                <option value="short text">Short Text</option>
-                                <option value="long text">Long Text</option>
-                                <option value="checkbox">Checkbox</option>
-                                <option value="number">Number</option>
-                                <option value="date">Date</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Ask Frequency</label>
-                            <select id="question-ask" class="input-field w-full px-4 py-3 rounded-xl">
-                                <option value="every time">Every Time</option>
-                                <option value="once">Once</option>
-                                <option value="if has changed">If Has Changed</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mb-6">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" id="question-required" class="checkbox-custom">
-                            <span class="font-medium">Required</span>
-                        </label>
-                    </div>
-                    <div class="flex gap-4">
-                        <button type="button" onclick="closeQuestionModal()" class="btn-secondary flex-1 py-3 rounded-xl font-semibold">Cancel</button>
-                        <button type="submit" class="btn-primary flex-1 py-3 rounded-xl font-semibold">Save</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Password Modal -->
-    <div id="password-modal" class="fixed inset-0 z-50 hidden">
-        <div class="modal-overlay absolute inset-0"></div>
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="modal-content glass-card rounded-3xl p-8 w-full max-w-md relative z-10">
-                <h2 class="text-2xl font-bold mb-6">Business Portal Login</h2>
-                <form onsubmit="handlePasswordSubmit(event)">
-                    <div class="mb-4">
-                        <label class="block text-sm font-semibold mb-2">Password</label>
-                        <input type="password" id="business-password" class="input-field w-full px-4 py-3 rounded-xl" required>
-                        <p id="password-error" class="text-red-500 text-sm mt-2 hidden">Incorrect password.</p>
-                    </div>
-                    
-                    <!-- TURNSTILE WIDGET -->
-                    <div class="cf-turnstile mb-4" data-sitekey="0x4AAAAAACe7Xzo-HnnSOxBi" data-theme="light"></div>
-                    
-                    <div class="flex gap-4">
-                        <button type="button" onclick="closePasswordModal()" class="btn-secondary flex-1 py-3 rounded-xl font-semibold">Cancel</button>
-                        <button type="submit" class="btn-primary flex-1 py-3 rounded-xl font-semibold">Login</button>
                     </div>
                 </form>
             </div>
@@ -1929,7 +1961,7 @@
             btn.innerHTML = '<div class="spinner"></div> Loading...';
             
             try {
-                const response = await callAppsScript('checkCustomer', { email });
+                const response = await sb_checkCustomer(email);
                 if (response.exists) {
                     state.existingCustomer = response.customer;
                     document.getElementById('welcome-name').textContent = response.customer.fullName;
@@ -2192,7 +2224,7 @@
             
             // Fetch their credits
             try {
-                const response = await callAppsScript('getCheckoutData', { emails: [email] });
+                const response = await sb_getCheckoutData([email]);
                 const newCredits = response.credits || [];
                 const newGCs = response.giftCards || [];
                 
@@ -2835,7 +2867,7 @@
             tbody.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-gray-500">Loading...</td></tr>';
             
             try {
-                const response = await callAppsScript('getCustomers', { page: state.customerPage, search: '' });
+                const response = await sb_getCustomers(state.customerPage, state.customerSearch);
                 state.customers = response.customers || [];
                 
                 renderCustomerRows(state.customers);
@@ -2897,7 +2929,7 @@
             tbody.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-gray-500">Searching...</td></tr>';
             
             try {
-                const response = await callAppsScript('getCustomers', { page: 0, search: query });
+                const response = await sb_getCustomers(state.customerPage, query);
                 state.customers = response.customers || [];
                 
                 renderCustomerRows(state.customers);
@@ -2917,7 +2949,7 @@
             btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>';
             
             try {
-                const response = await callAppsScript('getCustomers', { page: state.customerPage, search: state.customerSearch });
+                const response = await sb_getCustomers(state.customerPage, state.customerSearch);
                 const newCustomers = response.customers || [];
                 
                 state.customers = [...state.customers, ...newCustomers];
@@ -3048,7 +3080,7 @@
             const container = document.getElementById('customer-appointments');
             
             try {
-                const response = await callAppsScript('getCustomerHistory', { customerId: customerId });
+                const response = await sb_getCustomerHistory(customerId);
                 const history = response.history || [];
                 
                 if (history.length === 0) {
@@ -3110,7 +3142,7 @@
             }
             
             try {
-                const response = await callAppsScript('checkCustomer', { email });
+                const response = await sb_checkCustomer(email);
                 if (response.exists) {
                     state.existingCustomer = response.customer;
                     document.getElementById('welcome-name').textContent = response.customer.fullName;
@@ -3395,7 +3427,7 @@
         
         async function loadDiscounts() {
             try {
-                const response = await callAppsScript('getDiscounts');
+                const response = await sb_getDiscounts();
                 state.allDiscounts = response.discounts || [];
             } catch (e) {
                 console.error("Error loading discounts", e);
@@ -3622,7 +3654,7 @@
             container.innerHTML = '<div class="spinner"></div>';
         
             try {
-                const response = await callAppsScript('getAppointments', { date: dateStr });
+                const response = await sb_getAppointments(dateStr);
                 state.checkoutAppointments = response.appointments || [];
                 
                 state.checkoutSelected = [];
@@ -3749,7 +3781,7 @@
             if (!code) return;
 
             try {
-                const response = await callAppsScript('validateDiscount', { code });
+                const response = await sb_validateDiscount(code);
                 if (response.valid) {
                     state.appliedDiscount = response.discount;
                     updateCheckoutSummary();
@@ -3826,7 +3858,7 @@
             }).filter(e => e))];
         
             // 3. Fetch Data
-            const response = await callAppsScript('getCheckoutData', { emails: allEmails });
+            const creditResponse = await sb_getCheckoutData(allEmails);
             state.checkoutAvailableCredits = response.credits || [];
             state.checkoutAvailableGCs = response.giftCards || [];
         
@@ -4220,7 +4252,7 @@
             tbody.innerHTML = '<tr><td colspan="6" class="text-center p-8">Loading...</td></tr>';
         
             try {
-                const response = await callAppsScript('getCreditManagement', { page: state.creditPage, search: '' });
+                const response = await sb_getCreditManagement(state.creditPage, '');
                 state.creditItems = response.items || [];
                 
                 renderCreditRows(state.creditItems);
@@ -4242,7 +4274,7 @@
             tbody.innerHTML = '<tr><td colspan="6" class="text-center p-8 text-gray-500">Searching...</td></tr>';
             
             try {
-                const response = await callAppsScript('getCreditManagement', { page: state.creditPage, search: query });
+                const response = await sb_getCreditManagement(state.creditPage, query);
                 state.creditItems = response.items || [];
                 
                 renderCreditRows(state.creditItems);
@@ -4262,7 +4294,7 @@
             btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>';
             
             try {
-                const response = await callAppsScript('getCreditManagement', { page: state.creditPage, search: state.creditSearch });
+                const response = await sb_getCreditManagement(state.creditPage, state.creditSearch);
                 const newItems = response.items || [];
                 
                 state.creditItems = [...state.creditItems, ...newItems];
@@ -4639,7 +4671,7 @@
             document.getElementById('packages-list-container').innerHTML = '<div class="text-center p-10"><div class="spinner"></div><p>Loading offers...</p></div>';
         
             try {
-                const response = await callAppsScript('getPackages');
+                const response = await sb_getPackages();
                 state.allPackages = response.packages || [];
                 togglePkgView('packages'); 
             } catch(e) {
