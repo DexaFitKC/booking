@@ -17,6 +17,23 @@
         light: '#FFFFFF'
       }
     };
+
+    const SUPABASE_URL = 'https://einvwopnfhjbydfumwzm.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpbnZ3b3BuZmhqYnlkZnVtd3ptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MjkwNDAsImV4cCI6MjA5MDIwNTA0MH0.AyJZ4_NNZs6i5_4hUtVl_KNf9JSl-b9ohxf343U61Xc';
+    
+    async function sbQuery(path) {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Accept': 'application/json'
+            }
+        });
+        if (!res.ok) throw new Error(`Supabase error: ${res.status}`);
+        const text = await res.text();
+        return text ? JSON.parse(text) : [];
+    }
+    
     window.onerror = function(message, source, lineno, colno, error) {
       if (lineno === 0 || (source && source.includes('turnstile')) || (source && source.includes('challenges.cloudflare'))) {
         console.warn("Suppressed external script error:", message);
@@ -28,6 +45,8 @@
       }
       return true;
     };
+
+    
   </script>
   <style>
     :root {
@@ -1061,64 +1080,72 @@ function loadData(type) {
   const loadingEl = document.getElementById(type === 'marketing' ? 'mktg-loading' : 'ops-loading');
   loadingEl.classList.remove('hidden');
 
-  fetch(CONFIG.APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({
-      action: 'getDashboardData',
-      password: STATE.password,
-      dashboardType: STATE.dashboardType,
-      turnstileToken: STATE.turnstileToken
-    })
-  })
-  .then(r => r.json())
-  .then(function(data) {
-      loadingEl.classList.add('hidden');
-      if (data.error) {
-        alert('Error: ' + data.error);
-        return;
-      }
-      STATE.appointments = data.appointments || [];
-      STATE.customers = data.customers || [];
-      STATE.discountValues = data.discountValues || [];
-      STATE.dataLoaded = true;
+  // Fetch from Supabase directly (much faster than Apps Script → Sheets)
+  Promise.all([
+    sbQuery('appointment_log?select=customer_email,service_name,est_cost,appt_date,status,booked_timestamp,discount_used,referrer,utm_content&order=id.asc'),
+    sbQuery('customers?select=email,sex,dob&order=id.asc')
+  ])
+  .then(function([apptRows, custRows]) {
+    loadingEl.classList.add('hidden');
 
-      // Build customer lookup
-      STATE.customerMap = {};
-      STATE.customers.forEach(c => {
-        if (c.email) STATE.customerMap[c.email.toString().toLowerCase().trim()] = c;
-      });
+    // Map to expected format
+    STATE.appointments = apptRows.map(r => ({
+      email:       r.customer_email || '',
+      services:    r.service_name || '',
+      cost:        r.est_cost || 0,
+      apptDate:    r.appt_date || '',
+      status:      r.status || '',
+      bookingDate: r.booked_timestamp || '',
+      discount:    r.discount_used || '',
+      referrer:    r.referrer || '',
+      utmcont:     r.utm_content || ''
+    }));
 
-      // Populate discount dropdown
-      const sel = document.getElementById('mktg-discount');
-      sel.innerHTML = '<option value="" disabled selected>Select a discount</option>';
-      STATE.discountValues.forEach(d => {
-        const o = document.createElement('option');
-        o.value = d;
-        o.textContent = d;
-        sel.appendChild(o);
-      });
+    STATE.customers = custRows.map(r => ({
+      email: r.email || '',
+      sex:   r.sex || '',
+      dob:   r.dob || ''
+    }));
 
-      // Set default date range (last 90 days)
-      const today = new Date();
-      const ago90 = new Date(today);
-      ago90.setDate(ago90.getDate() - 90);
-      const fmt = d => d.toISOString().split('T')[0];
-      if (type === 'marketing') {
-        document.getElementById('mktg-start').value = fmt(ago90);
-        document.getElementById('mktg-end').value = fmt(today);
-      } else {
-        document.getElementById('ops-start').value = fmt(ago90);
-        document.getElementById('ops-end').value = fmt(today);
-      }
+    // Build discount dropdown values
+    const discountSet = new Set();
+    STATE.appointments.forEach(a => { if (a.discount) discountSet.add(a.discount); });
+    STATE.discountValues = Array.from(discountSet).sort();
+    STATE.dataLoaded = true;
 
-      if (type === 'operations') {
-        runOpsFilter();
-      }
+    // Build customer lookup
+    STATE.customerMap = {};
+    STATE.customers.forEach(c => {
+      if (c.email) STATE.customerMap[c.email.toString().toLowerCase().trim()] = c;
+    });
+
+    // Populate discount dropdown
+    const sel = document.getElementById('mktg-discount');
+    sel.innerHTML = '<option value="" disabled selected>Select a discount</option>';
+    STATE.discountValues.forEach(d => {
+      const o = document.createElement('option');
+      o.value = d; o.textContent = d; sel.appendChild(o);
+    });
+
+    // Set default date range
+    const today = new Date();
+    const ago90 = new Date(today);
+    ago90.setDate(ago90.getDate() - 90);
+    const fmt = d => d.toISOString().split('T')[0];
+    if (type === 'marketing') {
+      document.getElementById('mktg-start').value = fmt(ago90);
+      document.getElementById('mktg-end').value = fmt(today);
+    } else {
+      document.getElementById('ops-start').value = fmt(ago90);
+      document.getElementById('ops-end').value = fmt(today);
+    }
+
+    if (type === 'operations') runOpsFilter();
   })
   .catch(function(e) {
-      loadingEl.classList.add('hidden');
-      alert('Failed to load data. Please try again.');
+    loadingEl.classList.add('hidden');
+    alert('Failed to load data. Please try again.');
+    console.error(e);
   });
 }
 
