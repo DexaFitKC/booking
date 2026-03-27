@@ -1521,6 +1521,31 @@
             </div>
         </div>
     </div>
+
+    <!-- Password Modal -->
+    <div id="password-modal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0"></div>
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="modal-content glass-card rounded-3xl p-8 w-full max-w-md relative z-10">
+                <h2 class="text-2xl font-bold mb-6">Business Portal Login</h2>
+                <form onsubmit="handlePasswordSubmit(event)">
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold mb-2">Password</label>
+                        <input type="password" id="business-password" class="input-field w-full px-4 py-3 rounded-xl" required>
+                        <p id="password-error" class="text-red-500 text-sm mt-2 hidden">Incorrect password.</p>
+                    </div>
+
+                    <!-- TURNSTILE WIDGET -->
+                    <div class="cf-turnstile mb-4" data-sitekey="0x4AAAAAACe7Xzo-HnnSOxBi" data-theme="light"></div>
+
+                    <div class="flex gap-4">
+                        <button type="button" onclick="closePasswordModal()" class="btn-secondary flex-1 py-3 rounded-xl font-semibold">Cancel</button>
+                        <button type="submit" class="btn-primary flex-1 py-3 rounded-xl font-semibold">Login</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     
     <!-- Payment Payer Selection Modal -->
     <div id="payer-modal" class="fixed inset-0 z-50 hidden">
