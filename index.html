@@ -3883,8 +3883,8 @@
         
             // 3. Fetch Data
             const creditResponse = await sb_getCheckoutData(allEmails);
-            state.checkoutAvailableCredits = response.credits || [];
-            state.checkoutAvailableGCs = response.giftCards || [];
+            state.checkoutAvailableCredits = creditResponse.credits || [];
+            state.checkoutAvailableGCs = creditResponse.giftCards || [];
         
             // 4. Populate UI
             document.getElementById('checkout-payer-name').textContent = `${payer.name} (${payer.email})`;
