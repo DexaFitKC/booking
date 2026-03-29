@@ -1085,11 +1085,11 @@ function loadData(type) {
 
   // Fetch from Supabase directly (much faster than Apps Script → Sheets)
   Promise.all([
-    sbQuery('appointment_log?select=customer_email,service_name,est_cost,appt_date,status,booked_timestamp,discount_used,referrer,utm_content&order=id.asc&limit=50000'),
-    sbQuery('customers?select=email,sex,dob&order=id.asc&limit=50000'),
-    sbQueryAll('time_clock?select=employee,clock_in,clock_out,hours&order=clock_in.asc&limit=5000')
-  ])
-  .then(function([apptRows, custRows]) {
+    sbQuery('appointment_log?select=customer_email,service_name,est_cost,appt_date,status,booked_timestamp,discount_used,referrer,utm_content&order=id.asc'),
+    sbQuery('customers?select=email,sex,dob&order=id.asc'),
+    sbQuery('time_clock?select=employee,clock_in,clock_out,hours&order=clock_in.asc')
+])
+.then(function([apptRows, custRows, clockRows]) {
     loadingEl.classList.add('hidden');
 
     // Map to expected format
