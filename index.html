@@ -951,6 +951,14 @@
                                     Checkout
                                 </button>
                             </li>
+                            <li>
+                                <button onclick="showBusinessSection('timeclock')" class="sidebar-item w-full text-left px-4 py-3 rounded-xl flex items-center gap-3" data-section="timeclock">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    Time Clock
+                                </button>
+                            </li>    
                         </ul>
                     </nav>
                     <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100">
@@ -1124,6 +1132,64 @@
                                         Continue
                                     </button>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Time Clock Section -->
+                    <div id="section-timeclock" class="business-section p-8 hidden">
+                        <div class="mb-8">
+                            <h1 class="text-3xl font-black text-gray-900">Time Clock</h1>
+                            <p class="text-gray-600">Clock in and out for your shift</p>
+                        </div>
+
+                        <div class="grid lg:grid-cols-2 gap-6">
+                            <!-- Clock In/Out Card -->
+                            <div class="glass-card rounded-2xl p-6">
+                                <h3 class="font-bold text-lg mb-4">Clock In / Out</h3>
+                                <div class="mb-4">
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Your Name</label>
+                                    <input type="text" id="tc-name" class="input-field w-full px-4 py-3 rounded-xl" placeholder="Enter your name">
+                                </div>
+                                <div class="flex gap-3">
+                                    <button onclick="clockIn()" class="btn-primary flex-1 py-3 rounded-xl font-semibold">
+                                        Clock In
+                                    </button>
+                                    <button onclick="clockOut()" class="flex-1 py-3 rounded-xl font-semibold text-red-600 border-2 border-red-300 hover:bg-red-50">
+                                        Clock Out
+                                    </button>
+                                </div>
+                                <p id="tc-message" class="mt-4 text-sm font-semibold hidden"></p>
+                            </div>
+
+                            <!-- Currently Clocked In -->
+                            <div class="glass-card rounded-2xl p-6">
+                                <h3 class="font-bold text-lg mb-4">Currently Clocked In</h3>
+                                <div id="tc-active-list">
+                                    <p class="text-gray-500 text-sm">Loading...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent History -->
+                        <div class="glass-card rounded-2xl p-6 mt-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-bold text-lg">Recent Entries</h3>
+                                <input type="date" id="tc-history-date" class="input-field px-4 py-2 rounded-xl" onchange="loadTimeClockHistory()">
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead class="bg-gray-50 border-b border-gray-100">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Employee</th>
+                                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Clock In</th>
+                                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Clock Out</th>
+                                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Hours</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tc-history-body">
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -2836,6 +2902,11 @@
                     case 'checkout': 
                         if (typeof loadCheckoutSection === 'function') loadCheckoutSection(); 
                         break;
+                }
+
+                if (section === 'timeclock') {
+                    loadActivePunches();
+                    loadTimeClockHistory();
                 }
                 
             } catch (e) {
@@ -5013,6 +5084,114 @@ async function callAppsScript(action, data = {}) {
         throw error;
     }
 }
+
+            // ============================================
+        // TIME CLOCK
+        // ============================================
+        function sanitizeEmployee(name) {
+            return name.toLowerCase().replace(/\s+/g, '').trim();
+        }
+
+        async function clockIn() {
+            const raw = document.getElementById('tc-name').value.trim();
+            if (!raw) { alert('Please enter your name.'); return; }
+            const emp = sanitizeEmployee(raw);
+
+            // Check if already clocked in
+            const open = await sbQuery(`time_clock?employee=eq.${encodeURIComponent(emp)}&clock_out=is.null&limit=1`);
+            if (open.length > 0) {
+                showTcMessage('You are already clocked in!', 'red');
+                return;
+            }
+
+            await callAppsScript('clockIn', { employee: emp });
+            showTcMessage(`${raw} clocked in at ${new Date().toLocaleTimeString()}`, 'green');
+            document.getElementById('tc-name').value = '';
+            loadActivePunches();
+            loadTimeClockHistory();
+        }
+
+        async function clockOut() {
+            const raw = document.getElementById('tc-name').value.trim();
+            if (!raw) { alert('Please enter your name.'); return; }
+            const emp = sanitizeEmployee(raw);
+
+            // Check if clocked in
+            const open = await sbQuery(`time_clock?employee=eq.${encodeURIComponent(emp)}&clock_out=is.null&limit=1`);
+            if (open.length === 0) {
+                showTcMessage('No open clock-in found for this name.', 'red');
+                return;
+            }
+
+            await callAppsScript('clockOut', { employee: emp, id: open[0].id });
+            const hrs = ((new Date() - new Date(open[0].clock_in)) / 3600000).toFixed(2);
+            showTcMessage(`${raw} clocked out. Shift: ${hrs} hours`, 'green');
+            document.getElementById('tc-name').value = '';
+            loadActivePunches();
+            loadTimeClockHistory();
+        }
+
+        function showTcMessage(text, color) {
+            const el = document.getElementById('tc-message');
+            el.textContent = text;
+            el.className = `mt-4 text-sm font-semibold text-${color === 'red' ? 'red' : 'green'}-600`;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 5000);
+        }
+
+        async function loadActivePunches() {
+            const rows = await sbQuery('time_clock?clock_out=is.null&order=clock_in.desc');
+            const container = document.getElementById('tc-active-list');
+            if (rows.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-sm">No one is currently clocked in.</p>';
+                return;
+            }
+            container.innerHTML = rows.map(r => {
+                const inTime = new Date(r.clock_in).toLocaleTimeString();
+                const elapsed = ((new Date() - new Date(r.clock_in)) / 3600000).toFixed(1);
+                return `
+                    <div class="flex items-center justify-between p-3 bg-green-50 rounded-xl mb-2 border border-green-200">
+                        <div>
+                            <span class="font-semibold text-green-800">${r.employee}</span>
+                            <span class="text-sm text-green-600 ml-2">since ${inTime}</span>
+                        </div>
+                        <span class="text-sm font-bold text-green-700">${elapsed}h</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadTimeClockHistory() {
+            const dateInput = document.getElementById('tc-history-date');
+            if (!dateInput.value) {
+                dateInput.value = new Date().toISOString().split('T')[0];
+            }
+            const dateStr = dateInput.value;
+            const startISO = dateStr + 'T00:00:00';
+            const endISO = dateStr + 'T23:59:59';
+
+            const rows = await sbQuery(
+                `time_clock?clock_in=gte.${encodeURIComponent(startISO)}&clock_in=lte.${encodeURIComponent(endISO)}&order=clock_in.desc`
+            );
+            const tbody = document.getElementById('tc-history-body');
+            if (rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-gray-500">No entries for this date.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = rows.map(r => {
+                const inTime = new Date(r.clock_in).toLocaleTimeString();
+                const outTime = r.clock_out ? new Date(r.clock_out).toLocaleTimeString() : '<span class="text-green-600 font-semibold">Active</span>';
+                const hrs = r.hours ? parseFloat(r.hours).toFixed(2) : '—';
+                return `
+                    <tr class="border-b border-gray-50">
+                        <td class="px-4 py-3 font-medium">${r.employee}</td>
+                        <td class="px-4 py-3 text-gray-600">${inTime}</td>
+                        <td class="px-4 py-3 text-gray-600">${outTime}</td>
+                        <td class="px-4 py-3 font-semibold">${hrs}h</td>
+                    </tr>
+                `;
+            }).join('');
+        }
 
         // ============================================
         // INITIALIZATION
