@@ -949,6 +949,9 @@
 
       <!-- Top 20 Customers -->
       <div class="section-panel mb-3" id="ops-top-section"></div>
+
+      <!-- Time Clock / Labor Metrics -->
+      <div class="section-panel mb-3" id="ops-timeclock-section"></div>
     </div>
 
     <div id="ops-empty" class="hidden" style="text-align:center;padding:40px;color:var(--text-muted);">
@@ -1083,7 +1086,8 @@ function loadData(type) {
   // Fetch from Supabase directly (much faster than Apps Script → Sheets)
   Promise.all([
     sbQuery('appointment_log?select=customer_email,service_name,est_cost,appt_date,status,booked_timestamp,discount_used,referrer,utm_content&order=id.asc&limit=50000'),
-    sbQuery('customers?select=email,sex,dob&order=id.asc&limit=50000')
+    sbQuery('customers?select=email,sex,dob&order=id.asc&limit=50000'),
+    sbQueryAll('time_clock?select=employee,clock_in,clock_out,hours&order=clock_in.asc&limit=5000')
   ])
   .then(function([apptRows, custRows]) {
     loadingEl.classList.add('hidden');
@@ -1105,6 +1109,13 @@ function loadData(type) {
       email: r.email || '',
       sex:   r.sex || '',
       dob:   r.dob || ''
+    }));
+
+    STATE.clockEntries = clockRows.map(r => ({
+      employee: r.employee || '',
+      clockIn: r.clock_in || '',
+      clockOut: r.clock_out || '',
+      hours: r.hours ? parseFloat(r.hours) : null
     }));
 
     // Build discount dropdown values
@@ -1486,9 +1497,155 @@ function renderOpsContent(appts) {
   // ─── 8. Top 20 Customers ───
   renderTop20(completed);
 
+  // ─── 9. Time Clock / Labor ───
+  renderTimeClock(appts, completed);
+
   document.getElementById('ops-content').classList.remove('hidden');
 }
 
+// Time clock function
+  // ─── TIME CLOCK / LABOR METRICS ───
+function renderTimeClock(allAppts, completed) {
+  const startVal = document.getElementById('ops-start').value;
+  const endVal = document.getElementById('ops-end').value;
+  const start = startVal ? new Date(startVal + 'T00:00:00') : null;
+  const end = endVal ? new Date(endVal + 'T23:59:59') : null;
+
+  // Filter clock entries to date range
+  const filtered = STATE.clockEntries.filter(c => {
+    if (!c.clockIn || !c.hours) return false;
+    const d = new Date(c.clockIn);
+    if (isNaN(d)) return false;
+    if (start && d < start) return false;
+    if (end && d > end) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    document.getElementById('ops-timeclock-section').innerHTML = `
+      <div class="section-title">Time Clock & Labor Metrics</div>
+      <div class="section-body"><p style="color:var(--text-muted);">No time clock data for this date range.</p></div>
+    `;
+    return;
+  }
+
+  // ─── By Employee ───
+  const byEmployee = {};
+  filtered.forEach(c => {
+    if (!byEmployee[c.employee]) byEmployee[c.employee] = { hours: 0, shifts: 0, entries: [] };
+    byEmployee[c.employee].hours += c.hours;
+    byEmployee[c.employee].shifts++;
+    byEmployee[c.employee].entries.push(c);
+  });
+
+  const totalHours = filtered.reduce((s, c) => s + c.hours, 0);
+  const totalShifts = filtered.length;
+  const employees = Object.keys(byEmployee).sort();
+
+  // ─── Completed appointment metrics ───
+  const completedCount = completed.length;
+  let totalServices = 0;
+  let totalRevenue = 0;
+  completed.forEach(a => {
+    totalServices += parseServices(a.services).length;
+    totalRevenue += Number(a.cost) || 0;
+  });
+
+  const apptsPerHour = totalHours > 0 ? (completedCount / totalHours) : 0;
+  const servicesPerHour = totalHours > 0 ? (totalServices / totalHours) : 0;
+  const revenuePerHour = totalHours > 0 ? (totalRevenue / totalHours) : 0;
+  const avgShiftLength = totalShifts > 0 ? (totalHours / totalShifts) : 0;
+
+  // ─── Employee table ───
+  const maxHrs = Math.max(...Object.values(byEmployee).map(e => e.hours), 1);
+  const empRows = employees.map(emp => {
+    const e = byEmployee[emp];
+    const avg = e.shifts > 0 ? (e.hours / e.shifts) : 0;
+    return `
+      <tr>
+        <td style="font-weight:600;">${emp}</td>
+        <td>${e.shifts}</td>
+        <td>${e.hours.toFixed(2)}</td>
+        <td>${avg.toFixed(2)}</td>
+        <td style="width:40%;">
+          <div class="bar-track" style="height:20px;">
+            <div class="bar-fill" style="width:${(e.hours/maxHrs*100).toFixed(1)}%;background:var(--brand-primary);font-size:11px;">
+              ${e.hours.toFixed(1)}h
+            </div>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // ─── By DOW ───
+  const dowHours = [0,0,0,0,0,0,0];
+  filtered.forEach(c => {
+    const d = new Date(c.clockIn);
+    if (!isNaN(d)) dowHours[d.getDay()] += c.hours;
+  });
+  const maxDow = Math.max(...dowHours, 1);
+
+  const section = document.getElementById('ops-timeclock-section');
+  section.innerHTML = `
+    <div class="section-title">Time Clock & Labor Metrics</div>
+    <div class="section-body">
+      <!-- Summary Stats -->
+      <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 24px;">
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-label">Total Hours</div>
+          <div class="stat-value">${totalHours.toFixed(1)}</div>
+          <div class="stat-sub">${totalShifts} shifts, ${employees.length} employees</div>
+        </div>
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-label">Avg Shift Length</div>
+          <div class="stat-value">${avgShiftLength.toFixed(1)}<span style="font-size:14px;color:var(--text-secondary);"> hrs</span></div>
+        </div>
+        <div class="stat-card" style="cursor:default; border-left: 4px solid var(--success);">
+          <div class="stat-label">Appts / Hour</div>
+          <div class="stat-value">${apptsPerHour.toFixed(2)}</div>
+          <div class="stat-sub">${completedCount} completed appts</div>
+        </div>
+        <div class="stat-card" style="cursor:default; border-left: 4px solid var(--brand-primary);">
+          <div class="stat-label">Services / Hour</div>
+          <div class="stat-value">${servicesPerHour.toFixed(2)}</div>
+          <div class="stat-sub">${totalServices} total services</div>
+        </div>
+        <div class="stat-card" style="cursor:default; border-left: 4px solid var(--warning);">
+          <div class="stat-label">Revenue / Hour</div>
+          <div class="stat-value">${fmtCurrency(revenuePerHour)}</div>
+          <div class="stat-sub">${fmtCurrency(totalRevenue)} total</div>
+        </div>
+      </div>
+
+      <!-- Hours by Employee (Payroll) -->
+      <p style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:12px;">Hours by Employee (Payroll Summary)</p>
+      <div class="table-scroll" style="margin-bottom:24px;">
+        <table>
+          <thead><tr><th>Employee</th><th>Shifts</th><th>Total Hours</th><th>Avg Shift</th><th>Distribution</th></tr></thead>
+          <tbody>${empRows}</tbody>
+        </table>
+      </div>
+
+      <!-- Hours by DOW -->
+      <p style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:12px;">Labor Hours by Day of Week</p>
+      <div class="bar-chart">
+        ${DAYS_SHORT.map((day, i) => `
+          <div class="bar-row">
+            <div class="bar-label">${day}</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${(dowHours[i]/maxDow*100).toFixed(1)}%;background:#7ac0fd;${dowHours[i]===0?'padding:0;':''}">
+                ${dowHours[i] > 0 ? dowHours[i].toFixed(1) + 'h' : ''}
+              </div>
+            </div>
+            <div class="bar-val">${dowHours[i].toFixed(1)}h</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+  
 // ─── STATUS RATES ───
 function renderStatusRates(appts) {
   const counts = {};
