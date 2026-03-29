@@ -2902,11 +2902,10 @@
                     case 'checkout': 
                         if (typeof loadCheckoutSection === 'function') loadCheckoutSection(); 
                         break;
-                }
-
-                if (section === 'timeclock') {
-                    loadActivePunches();
-                    loadTimeClockHistory();
+                    case 'timeclock':
+                        loadActivePunches();
+                        loadTimeClockHistory();
+                        break;
                 }
                 
             } catch (e) {
