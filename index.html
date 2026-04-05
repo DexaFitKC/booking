@@ -16,7 +16,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DexaBook - Scheduling System</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.17/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://js.stripe.com/v3/"></script>
@@ -2328,12 +2328,15 @@
                 state.checkoutAvailableCredits = [...state.checkoutAvailableCredits, ...newCredits];
                 state.checkoutAvailableGCs = [...state.checkoutAvailableGCs, ...newGCs];
                 
-                // Show in UI
+                // Show in UI — sum actual values instead of counting records
+                const totalCreditQty = newCredits.reduce((sum, c) => sum + Math.floor(parseFloat(c.value) || 0), 0);
+                const totalGCValue = newGCs.reduce((sum, g) => sum + (parseFloat(g.value) || 0), 0);
+                
                 const container = document.getElementById('crediting-customer-list');
                 container.innerHTML += `
                     <div class="flex items-center justify-between bg-white p-2 rounded border border-purple-200 text-sm">
                         <span class="font-medium">${email}</span>
-                        <span class="text-purple-600">${newCredits.length} credit(s), ${newGCs.length} GC(s)</span>
+                        <span class="text-purple-600">${totalCreditQty} credit(s), $${totalGCValue.toFixed(2)} in GC(s)</span>
                     </div>
                 `;
                 
