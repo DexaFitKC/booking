@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" href="//img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/favicon/808bdf2c-2a53-49a6-a0be-016f10978993/66bfdeea-79f7-45a9-881d-ecbc468da3e2.png/:/rs=w:32,h:32,m" sizes="32x32">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DexaFit KC — Order Bloodwork</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        :root {
+            --brand-primary: #46A5FC;
+            --brand-primary-dark: #2d8ad9;
+            --brand-dark: #000000;
+            --brand-light: #FFFFFF;
+        }
+        * { font-family: 'Montserrat', sans-serif; }
+        body { background: var(--brand-light); color: var(--brand-dark); }
+        .gradient-bg { background: linear-gradient(135deg, #46A5FC 0%, #2d8ad9 50%, #1a6cb8 100%); }
+        .glass-card { background: rgba(255,255,255,0.95); backdrop-filter: blur(20px); border: 1px solid rgba(70,165,252,0.2); }
+        .btn-primary { background: linear-gradient(135deg, #46A5FC 0%, #2d8ad9 100%); color: white; transition: all 0.3s; box-shadow: 0 4px 15px rgba(70,165,252,0.3); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(70,165,252,0.4); }
+        .btn-secondary { background: var(--brand-light); color: #525252; border: 2px solid var(--brand-primary); transition: all 0.3s; }
+        .btn-secondary:hover { background: var(--brand-primary); color: white; }
+        .input-field { border: 2px solid #e5e7eb; transition: all 0.3s; }
+        .input-field:focus { border-color: var(--brand-primary); box-shadow: 0 0 0 4px rgba(70,165,252,0.1); outline: none; }
+        .spinner { border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #46A5FC; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .bw-item { transition: all 0.2s; cursor: pointer; }
+        .bw-item:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+        .bw-item.in-cart { border-color: var(--brand-primary); background: linear-gradient(135deg, rgba(70,165,252,0.03) 0%, rgba(70,165,252,0.08) 100%); }
+        .cat-tab { transition: all 0.2s; cursor: pointer; }
+        .cat-tab.active { background: var(--brand-primary); color: white; }
+        .code-label { font-size: 0.7em; color: #888; font-weight: 400; }
+        .powered-by { font-size: 0.65em; color: #46A5FC; font-weight: 600; letter-spacing: 0.5px; }
+        .review-tag { font-size: 0.65em; color: #888; font-weight: 400; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: var(--brand-primary); border-radius: 4px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.4s ease forwards; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+<script>
+const CONFIG = {
+    STRIPE_PUBLIC_KEY: 'pk_live_51SvR6q0Is9ppr7DjiGonat9GCoOUfHAHqUp1Q99uHW8dJHgj7yBPiLDSwxSdhamXCrwHOVfcqLFWoTHKcdZtduYy00DkssIZLY',
+    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyUCDh4GLd3nHyxh7Mil5Q6HUXJASbUC6ihuWIa_4tyW5j0SXYyFa766Fax31AMqZwfWw/exec'
+};
+
+const SUPABASE_URL = 'https://einvwopnfhjbydfumwzm.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpbnZ3b3BuZmhqYnlkZnVtd3ptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MjkwNDAsImV4cCI6MjA5MDIwNTA0MH0.AyJZ4_NNZs6i5_4hUtVl_KNf9JSl-b9ohxf343U61Xc';
+
+async function sbQuery(path) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error(`Supabase error: ${res.status}`);
+    const text = await res.text();
+    return text ? JSON.parse(text) : [];
+}
+
+async function callAppsScript(action, data = {}) {
+    const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, ...data })
+    });
+    const text = await response.text();
+    if (text.startsWith("<!DOCTYPE") || text.startsWith("<html")) throw new Error("Server error.");
+    const jsonData = JSON.parse(text);
+    if (jsonData.error) throw new Error(jsonData.error);
+    return jsonData;
+}
+
+// ============================================
+// BLOODWORK CATALOG DATA
+// ============================================
+const INDIVIDUAL_MARKERS = [
+    { code: '0007600', name: 'Lipid Panel, Standard', price: 27, desc: 'Measures total cholesterol, LDL, HDL, and triglycerides — essential for assessing cardiovascular risk.' },
+    { code: '0000223', name: 'Albumin', price: 16, desc: 'A key protein made by the liver; low levels may indicate liver disease, kidney issues, or malnutrition.' },
+    { code: '0000234', name: 'Alkaline Phosphatase', price: 16, desc: 'An enzyme linked to liver and bone health; elevated levels may signal liver obstruction or bone disorders.' },
+    { code: '0000823', name: 'ALT', price: 16, desc: 'A liver enzyme; elevated ALT is one of the earliest signs of liver inflammation or damage.' },
+    { code: '0005223', name: 'Apolipoprotein A1', price: 32, desc: 'The main protein in HDL ("good") cholesterol — higher levels are associated with lower cardiovascular risk.' },
+    { code: '0005224', name: 'Apolipoprotein B', price: 27, desc: 'Found on LDL particles; considered a superior predictor of heart disease compared to LDL cholesterol alone.' },
+    { code: '0039462', name: 'Asialo-GM-1 Gangl.Ab', price: 94, desc: 'An antibody marker used in evaluating certain autoimmune neuropathies and nerve-related conditions.' },
+    { code: '0000822', name: 'AST', price: 16, desc: 'An enzyme found in the liver and heart; elevated AST can indicate liver damage or cardiac injury.' },
+    { code: '0010165', name: 'Basic Metab Pnl', price: 21, desc: 'A foundational panel measuring glucose, calcium, electrolytes, and kidney function markers.' },
+    { code: '0000287', name: 'Bilirubin, Total', price: 16, desc: 'A byproduct of red blood cell breakdown; elevated levels may indicate liver dysfunction or hemolysis.' },
+    { code: '0000296', name: 'BUN/Creat Ratio', price: 19, desc: 'Evaluates kidney function and hydration status by comparing blood urea nitrogen to creatinine.' },
+    { code: '0000303', name: 'Calcium', price: 18, desc: 'Critical for bone health, nerve function, and heart rhythm — abnormal levels can signal parathyroid or kidney issues.' },
+    { code: '0000310', name: 'Carbon Dioxide', price: 18, desc: 'Part of electrolyte balance; abnormal CO2 levels may indicate respiratory or metabolic imbalances.' },
+    { code: '0006399', name: 'CBC (Diff/Plt)', price: 36, desc: 'A comprehensive blood count measuring red cells, white cells, hemoglobin, and platelets — a core health screening tool.' },
+    { code: '0000330', name: 'Chloride', price: 18, desc: 'An essential electrolyte that helps maintain fluid balance, blood pressure, and pH levels.' },
+    { code: '0032474', name: 'Chol Total,(Refl)', price: 9, desc: 'A reflex cholesterol test that triggers additional lipid testing if initial results are abnormal.' },
+    { code: '0000334', name: 'Cholesterol, Total', price: 9, desc: 'A basic measure of all cholesterol in the blood — a starting point for cardiovascular risk assessment.' },
+    { code: '0010231', name: 'Comp Metab Pnl', price: 24, desc: 'An expanded metabolic panel covering liver function, kidney markers, electrolytes, and blood glucose.' },
+    { code: '0038171', name: 'Cortisol 15 Min', price: 32, desc: 'Measures cortisol at the 15-minute mark during stimulation testing to assess adrenal response.' },
+    { code: '0038172', name: 'Cortisol 30 Min', price: 32, desc: 'Cortisol measured at 30 minutes — used in dynamic testing to evaluate adrenal gland function.' },
+    { code: '0038173', name: 'Cortisol 60 Min', price: 32, desc: 'The 60-minute cortisol draw helps confirm whether the adrenal glands are responding properly to stimulation.' },
+    { code: '0038149', name: 'Cortisol Baseline', price: 32, desc: 'A starting cortisol measurement taken before stimulation — serves as the reference point for adrenal testing.' },
+    { code: '0004212', name: 'Cortisol, A.M.', price: 32, desc: 'Morning cortisol peaks between 6–8 AM; this test evaluates your body\'s natural stress hormone rhythm.' },
+    { code: '0004213', name: 'Cortisol, P.M.', price: 32, desc: 'Afternoon cortisol should be lower than morning; helps assess adrenal fatigue or Cushing\'s syndrome.' },
+    { code: '0000367', name: 'Cortisol, Total', price: 32, desc: 'Measures overall cortisol levels — the primary stress hormone affecting metabolism, immunity, and inflammation.' },
+    { code: '000037', name: 'Creatinine', price: 18, desc: 'A waste product from muscle metabolism; used as a primary marker for kidney filtration efficiency.' },
+    { code: '0000402', name: 'DHEA-Sulfate', price: 24, desc: 'A precursor to testosterone and estrogen; reflects adrenal function and is linked to aging and vitality.' },
+    { code: '0034392', name: 'Electrolyte Panel', price: 19, desc: 'Measures sodium, potassium, chloride, and CO2 — critical for hydration, nerve function, and heart health.' },
+    { code: '0004021', name: 'Estradiol', price: 36, desc: 'The primary form of estrogen; important for reproductive health, bone density, and cardiovascular protection.' },
+    { code: '0000449', name: 'Fatty Acids, Free', price: 20, desc: 'Measures circulating free fatty acids — elevated levels are linked to insulin resistance and metabolic syndrome.' },
+    { code: '0000457', name: 'Ferritin', price: 14, desc: 'Reflects your body\'s iron stores; low ferritin can cause fatigue, while high levels may indicate inflammation.' },
+    { code: '0000461', name: 'Fibrinogen Qn', price: 18, desc: 'A protein involved in blood clotting; elevated levels are associated with increased cardiovascular risk.' },
+    { code: '0000467', name: 'Folate, RBC', price: 21, desc: 'Measures folate stored in red blood cells — a more stable indicator of long-term folate status than serum folate.' },
+    { code: '0000466', name: 'Folate, Serum', price: 21, desc: 'Reflects recent dietary folate intake; essential for DNA synthesis and red blood cell production.' },
+    { code: '0000470', name: 'FSH', price: 28, desc: 'Follicle-stimulating hormone — key for evaluating fertility, menopause status, and pituitary function.' },
+    { code: '0007137', name: 'FSH & LH (S)', price: 55, desc: 'Combined FSH and LH testing provides a comprehensive picture of reproductive hormone balance.' },
+    { code: '0000483', name: 'Glucose, Serum', price: 21, desc: 'A fasting glucose test used to screen for diabetes, prediabetes, and metabolic health.' },
+    { code: '0000608', name: 'HDL-Cholesterol', price: 9, desc: 'High-density lipoprotein — the "good" cholesterol that helps remove LDL from arteries.' },
+    { code: '0000509', name: 'Hematocrit', price: 36, desc: 'Measures the proportion of red blood cells in your blood — used to detect anemia or dehydration.' },
+    { code: '0000510', name: 'Hemoglobin (B)', price: 37, desc: 'The oxygen-carrying protein in red blood cells; low levels indicate anemia.' },
+    { code: '0000496', name: 'Hemoglobin A1C', price: 15, desc: 'Reflects average blood sugar over 2–3 months — the gold standard for diabetes monitoring.' },
+    { code: '0010256', name: 'Hepatic Func Pnl', price: 21, desc: 'A liver function panel measuring key enzymes and proteins to assess liver health.' },
+    { code: '0031789', name: 'Homocysteine', price: 36, desc: 'An amino acid linked to cardiovascular disease and B-vitamin deficiency when elevated.' },
+    { code: '0010124', name: 'HS CRP', price: 27, desc: 'High-sensitivity C-reactive protein — a marker of systemic inflammation and cardiovascular risk.' },
+    { code: '0016293', name: 'IGF I, ECL', price: 54, desc: 'Insulin-like growth factor 1 — reflects growth hormone activity and is linked to muscle growth and aging.' },
+    { code: '0000561', name: 'Insulin', price: 24, desc: 'Measures fasting insulin levels; elevated insulin can indicate insulin resistance before glucose rises.' },
+    { code: '0000571', name: 'Iron, Total', price: 18, desc: 'Measures the total iron in your blood — important for diagnosing iron deficiency or overload.' },
+    { code: '0000599', name: 'Lead, (B)', price: 23, desc: 'Screens for lead exposure, which can cause neurological, kidney, and cardiovascular damage over time.' },
+    { code: '0000615', name: 'LH', price: 38, desc: 'Luteinizing hormone — essential for ovulation in women and testosterone production in men.' },
+    { code: '0034604', name: 'Lipoprotein (A)', price: 40, desc: 'A genetic cardiovascular risk factor; elevated Lp(a) increases the risk of heart attack and stroke.' },
+    { code: '0000623', name: 'Magnesium, RBC', price: 23, desc: 'Red blood cell magnesium is a better indicator of true magnesium status than serum magnesium.' },
+    { code: '0000636', name: 'Mercury (B)', price: 64, desc: 'Tests for mercury exposure from fish, dental fillings, or environmental sources — toxic to the nervous system.' },
+    { code: '0091734', name: 'Omega3/6 Fatty Acids', price: 57, desc: 'Measures your omega-3 to omega-6 ratio — a key indicator of inflammation balance and heart health.' },
+    { code: '0000718', name: 'Phosphate (As Phos)', price: 18, desc: 'Essential for bone formation and energy metabolism; abnormal levels may signal kidney or parathyroid issues.' },
+    { code: '0000723', name: 'Platelet Count', price: 37, desc: 'Measures blood-clotting cells — low counts increase bleeding risk, while high counts may indicate inflammation.' },
+    { code: '0000733', name: 'Potassium', price: 21, desc: 'A critical electrolyte for heart rhythm and muscle function; abnormal levels can be life-threatening.' },
+    { code: '0031493', name: 'Pregnenolone LC/MS/MS', price: 62, desc: 'The "mother hormone" — a precursor to cortisol, DHEA, and sex hormones; declines with age and stress.' },
+    { code: '0000745', name: 'Progesterone', price: 21, desc: 'Key for menstrual cycle regulation, pregnancy support, and hormonal balance in both men and women.' },
+    { code: '0000746', name: 'Prolactin', price: 25, desc: 'Primarily known for lactation, but elevated prolactin can indicate pituitary issues or hormonal imbalances.' },
+    { code: '0007577', name: 'Protein, Tot and Alb', price: 17, desc: 'Measures total protein and albumin — reflects nutritional status, liver function, and kidney health.' },
+    { code: '0000783', name: 'Red Blood Cell Count', price: 36, desc: 'Counts the total red blood cells; abnormalities can indicate anemia, dehydration, or bone marrow issues.' },
+    { code: '0010314', name: 'Renal Func Pnl', price: 22, desc: 'A kidney function panel including BUN, creatinine, and electrolytes to assess renal health.' },
+    { code: '0090963', name: 'RT3 by LC/MS/MS', price: 37, desc: 'Reverse T3 — an inactive thyroid hormone that can block active T3, often elevated during stress or illness.' },
+    { code: '0005507', name: 'Selenium', price: 40, desc: 'A trace mineral essential for thyroid function, antioxidant defense, and immune system support.' },
+    { code: '0030740', name: 'SHBG', price: 43, desc: 'Sex hormone-binding globulin — controls how much testosterone and estrogen is available for your body to use.' },
+    { code: '0000836', name: 'Sodium', price: 18, desc: 'A primary electrolyte regulating fluid balance and blood pressure; critical for nerve and muscle function.' },
+    { code: '0000861', name: 'T-3 Uptake', price: 12, desc: 'An indirect measure of thyroid-binding proteins that helps interpret other thyroid test results.' },
+    { code: '0034429', name: 'T-3, Free', price: 23, desc: 'The active thyroid hormone — directly measures what\'s available to your cells for metabolism regulation.' },
+    { code: '0000859', name: 'T-3, Total', price: 21, desc: 'Measures all T3 (bound + free); useful alongside Free T3 for a complete thyroid assessment.' },
+    { code: '0000866', name: 'T-4, Free', price: 16, desc: 'Free thyroxine — the unbound form of the main thyroid hormone, directly available for conversion to active T3.' },
+    { code: '0036170', name: 'Testosterone, Fr&Tot', price: 75, desc: 'Measures both total and free testosterone — essential for assessing energy, muscle mass, libido, and mood.' },
+    { code: '0000267', name: 'Thyroglobulin Ab', price: 23, desc: 'Antibodies against thyroglobulin — elevated levels suggest autoimmune thyroid disease like Hashimoto\'s.' },
+    { code: '0005081', name: 'Thyroid Peroxid Ab', price: 20, desc: 'TPO antibodies are the most common marker for autoimmune thyroid conditions including Hashimoto\'s thyroiditis.' },
+    { code: '0000896', name: 'Triglycerides', price: 10, desc: 'A type of fat in the blood; high triglycerides increase the risk of heart disease and pancreatitis.' },
+    { code: '0000899', name: 'TSH', price: 31, desc: 'Thyroid-stimulating hormone — the first-line test for thyroid function, detecting both hypo- and hyperthyroidism.' },
+    { code: '0090896', name: 'TSH, Pregnancy', price: 31, desc: 'TSH measured with pregnancy-specific reference ranges, since thyroid needs change during pregnancy.' },
+    { code: '0000294', name: 'Urea Nitrogen (BUN)', price: 16, desc: 'A waste product from protein metabolism; helps evaluate kidney function and hydration.' },
+    { code: '0000905', name: 'Uric Acid', price: 9, desc: 'Elevated uric acid can cause gout and kidney stones; also linked to cardiovascular and metabolic risk.' },
+    { code: '0017306', name: 'Vit D,25-OH,Total,IA', price: 43, desc: 'The standard vitamin D test — essential for bone health, immune function, and mood regulation.' },
+    { code: '0000921', name: 'Vitamin A (Retinol)', price: 43, desc: 'Important for vision, immune function, and skin health; both deficiency and excess can cause problems.' },
+    { code: '0005042', name: 'Vitamin B1, Thiamine', price: 43, desc: 'Essential for energy metabolism and nervous system function; deficiency can cause serious neurological issues.' },
+    { code: '0000927', name: 'Vitamin B12', price: 43, desc: 'Critical for nerve function, red blood cell production, and DNA synthesis; deficiency causes fatigue and neurological symptoms.' },
+    { code: '0000319', name: 'VLDL Cholesterol', price: 13, desc: 'Very-low-density lipoprotein carries triglycerides; elevated VLDL contributes to plaque buildup in arteries.' },
+    { code: '0000937', name: 'WBC', price: 36, desc: 'White blood cell count — your immune system\'s frontline; abnormalities can indicate infection, inflammation, or blood disorders.' },
+    { code: '0000945', name: 'Zinc (P)', price: 30, desc: 'A trace mineral vital for immune function, wound healing, testosterone production, and taste/smell.' }
+];
+
+const PANELS = [
+    { name: 'Marek Health Executive Panel', partner: 'Marek Health', extra: '45min review with coach', price: 569, desc: 'A comprehensive executive-level blood panel paired with a 45-minute coaching session to review results, optimize health strategies, and create an actionable plan.' },
+    { name: 'InsideTracker Ultimate Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 355, desc: 'The most comprehensive InsideTracker panel — tests dozens of biomarkers spanning heart health, metabolism, inflammation, hormones, and more, plus full platform access with personalized recommendations.' },
+    { name: 'InsideTracker Heart Health Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Focused on cardiovascular biomarkers including cholesterol, triglycerides, and inflammation markers to assess and optimize heart health.' },
+    { name: 'InsideTracker Inflammation Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Targets key inflammatory markers like hsCRP, helping you identify and reduce chronic inflammation linked to aging and disease.' },
+    { name: 'InsideTracker Cognition Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Measures biomarkers connected to brain health, cognitive performance, and neuroprotection for sharper mental function.' },
+    { name: 'InsideTracker Hormone Balance Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 157, desc: 'Evaluates key hormones including testosterone, cortisol, and thyroid markers to identify hormonal imbalances affecting energy, mood, and performance.' },
+    { name: 'InsideTracker Metabolism Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Focuses on metabolic biomarkers including glucose, insulin, and lipids to help optimize weight management and energy levels.' },
+    { name: 'InsideTracker Endurance Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Designed for athletes — measures biomarkers affecting aerobic capacity, oxygen transport, and recovery to fuel peak endurance.' },
+    { name: 'InsideTracker Sleep Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 157, desc: 'Analyzes biomarkers influencing sleep quality including cortisol, magnesium, and vitamin D to help you optimize rest and recovery.' },
+    { name: 'InsideTracker Recovery Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 157, desc: 'Measures markers of muscle damage, inflammation, and stress to help athletes and active individuals optimize their recovery.' },
+    { name: 'InsideTracker Fitness Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Tracks biomarkers tied to strength, body composition, and physical performance to guide your training and nutrition.' },
+    { name: 'InsideTracker Gut Health Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Evaluates markers related to gut barrier integrity, inflammation, and nutrient absorption for better digestive health.' }
+];
+
+const AT_HOME_KITS = [
+    { name: 'Optimal Male or Female Test', price: 599, desc: 'The most comprehensive at-home hormone and wellness panel — covers thyroid, metabolic, reproductive, and cardiovascular markers for a full health snapshot.' },
+    { name: 'Adrenal Health for Male or Female Test', price: 312, desc: 'Evaluates cortisol patterns and adrenal markers to identify adrenal fatigue, chronic stress, and HPA axis dysfunction.' },
+    { name: 'Heart Health Test', price: 212, desc: 'At-home cardiovascular screening covering cholesterol, triglycerides, and inflammatory markers linked to heart disease risk.' },
+    { name: 'Immunity & Stress Test', price: 187, desc: 'Measures key immune markers and cortisol levels to assess how stress is impacting your immune defenses.' },
+    { name: 'Essential Thyroid Test', price: 212, desc: 'A focused thyroid panel including TSH, Free T3, Free T4, and thyroid antibodies to detect thyroid dysfunction.' },
+    { name: 'Food Sensitivity Test', price: 175, desc: 'Identifies IgG antibody reactions to common foods — helps pinpoint dietary triggers for bloating, fatigue, and inflammation.' }
+];
+
+// ============================================
+// APP STATE
+// ============================================
+let bwState = {
+    step: 1, // 1=email, 2=catalog, 3=checkout
+    email: '',
+    customer: null,
+    cart: [], // { name, price, category, code? }
+    activeCategory: 'individual'
+};
+
+// ============================================
+// STEP 1: EMAIL LOOKUP
+// ============================================
+async function checkBwEmail() {
+    const email = document.getElementById('bw-email').value.trim();
+    if (!email || !email.includes('@')) { alert('Please enter a valid email.'); return; }
+    
+    const btn = document.getElementById('bw-email-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:3px;"></div> Looking up...';
+    
+    bwState.email = email;
+    
+    try {
+        const rows = await sbQuery(`customers?email=ilike.${encodeURIComponent(email)}&limit=1`);
+        if (rows.length > 0) {
+            const c = rows[0];
+            bwState.customer = { fullName: c.full_name, phone: c.phone, dob: c.dob, sex: c.sex, email: c.email };
+        } else {
+            bwState.customer = null;
+        }
+    } catch (e) {
+        bwState.customer = null;
+    }
+    
+    btn.disabled = false;
+    btn.innerHTML = 'Continue';
+    
+    bwState.step = 2;
+    renderStep();
+}
+
+// ============================================
+// RENDERING
+// ============================================
+function renderStep() {
+    document.getElementById('bw-step-1').classList.toggle('hidden', bwState.step !== 1);
+    document.getElementById('bw-step-2').classList.toggle('hidden', bwState.step !== 2);
+    document.getElementById('bw-step-3').classList.toggle('hidden', bwState.step !== 3);
+    
+    if (bwState.step === 2) renderCatalog();
+    if (bwState.step === 3) renderCheckoutForm();
+}
+
+function renderCatalog() {
+    renderCategoryTabs();
+    renderItems();
+    updateCartSummary();
+}
+
+function renderCategoryTabs() {
+    const tabs = document.getElementById('cat-tabs');
+    const cats = [
+        { id: 'individual', label: 'Individual Markers' },
+        { id: 'panels', label: 'Discounted Panels' },
+        { id: 'athome', label: 'At-Home Kits' }
+    ];
+    tabs.innerHTML = cats.map(c => `
+        <button onclick="switchCategory('${c.id}')" class="cat-tab px-4 py-2 rounded-full text-sm font-semibold border border-gray-200 ${bwState.activeCategory === c.id ? 'active' : 'bg-white text-gray-600 hover:bg-gray-50'}">${c.label}</button>
+    `).join('');
+}
+
+function switchCategory(cat) {
+    bwState.activeCategory = cat;
+    renderCategoryTabs();
+    renderItems();
+}
+
+function renderItems() {
+    const container = document.getElementById('bw-items');
+    let items = [];
+    
+    if (bwState.activeCategory === 'individual') {
+        items = INDIVIDUAL_MARKERS.map(m => ({
+            id: `ind_${m.code}`,
+            html: `<div class="flex items-start justify-between gap-3">
+                <div class="flex-1 min-w-0">
+                    <h4 class="font-bold text-sm">${m.name} <span class="code-label">${m.code}</span></h4>
+                    <p class="text-xs text-gray-500 mt-1 line-clamp-2">${m.desc}</p>
+                </div>
+                <div class="text-right shrink-0">
+                    <span class="font-bold text-blue-600">$${m.price}</span>
+                </div>
+            </div>`,
+            name: `${m.name} (${m.code})`, price: m.price
+        }));
+    } else if (bwState.activeCategory === 'panels') {
+        items = PANELS.map((p, i) => ({
+            id: `pnl_${i}`,
+            html: `<div class="flex items-start justify-between gap-3">
+                <div class="flex-1 min-w-0">
+                    <h4 class="font-bold text-sm">${p.name}</h4>
+                    <div class="powered-by mb-1">Powered by ${p.partner} <span class="review-tag">+ ${p.extra}</span></div>
+                    <p class="text-xs text-gray-500 mt-1 line-clamp-2">${p.desc}</p>
+                </div>
+                <div class="text-right shrink-0">
+                    <span class="font-bold text-blue-600">$${p.price.toFixed(2)}</span>
+                </div>
+            </div>`,
+            name: `${p.name} + ${p.extra}`, price: p.price
+        }));
+    } else {
+        items = AT_HOME_KITS.map((k, i) => ({
+            id: `kit_${i}`,
+            html: `<div class="flex items-start justify-between gap-3">
+                <div class="flex-1 min-w-0">
+                    <h4 class="font-bold text-sm">${k.name}</h4>
+                    <p class="text-xs text-gray-500 mt-1 line-clamp-2">${k.desc}</p>
+                </div>
+                <div class="text-right shrink-0">
+                    <span class="font-bold text-blue-600">$${k.price.toFixed(2)}</span>
+                </div>
+            </div>`,
+            name: k.name, price: k.price
+        }));
+    }
+    
+    container.innerHTML = items.map(item => {
+        const inCart = bwState.cart.find(c => c.id === item.id);
+        return `
+        <div class="bw-item glass-card rounded-xl p-4 border-2 ${inCart ? 'in-cart border-blue-400' : 'border-transparent'}" onclick="toggleCartItem('${item.id}', '${encodeURIComponent(item.name)}', ${item.price})">
+            ${item.html}
+            ${inCart ? '<div class="mt-2 text-xs font-bold text-blue-600">✓ In Cart</div>' : ''}
+        </div>`;
+    }).join('');
+}
+
+function toggleCartItem(id, encodedName, price) {
+    const name = decodeURIComponent(encodedName);
+    const idx = bwState.cart.findIndex(c => c.id === id);
+    if (idx > -1) {
+        bwState.cart.splice(idx, 1);
+    } else {
+        bwState.cart.push({ id, name, price, quantity: 1 });
+    }
+    renderItems();
+    updateCartSummary();
+}
+
+function updateCartSummary() {
+    const count = bwState.cart.length;
+    const total = bwState.cart.reduce((s, c) => s + c.price * c.quantity, 0);
+    
+    document.getElementById('cart-count').textContent = count;
+    document.getElementById('cart-total').textContent = `$${total.toFixed(2)}`;
+    document.getElementById('cart-checkout-btn').disabled = count === 0;
+    
+    const cartList = document.getElementById('cart-items-list');
+    if (count === 0) {
+        cartList.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">Your cart is empty</p>';
+    } else {
+        cartList.innerHTML = bwState.cart.map(c => `
+            <div class="flex items-center justify-between text-sm py-1 border-b border-gray-100">
+                <span class="truncate flex-1 mr-2">${c.name}</span>
+                <span class="font-bold shrink-0">$${c.price.toFixed(2)}</span>
+                <button onclick="event.stopPropagation(); removeFromCart('${c.id}')" class="ml-2 text-red-400 hover:text-red-600 shrink-0">✕</button>
+            </div>
+        `).join('');
+    }
+}
+
+function removeFromCart(id) {
+    bwState.cart = bwState.cart.filter(c => c.id !== id);
+    renderItems();
+    updateCartSummary();
+}
+
+function proceedToCheckout() {
+    if (bwState.cart.length === 0) return;
+    bwState.step = 3;
+    renderStep();
+}
+
+// ============================================
+// STEP 3: CHECKOUT FORM
+// ============================================
+function renderCheckoutForm() {
+    const c = bwState.customer;
+    const isReturning = !!c;
+    
+    document.getElementById('co-returning-badge').classList.toggle('hidden', !isReturning);
+    document.getElementById('co-new-badge').classList.toggle('hidden', isReturning);
+    
+    // Pre-fill if returning
+    document.getElementById('co-first').value = isReturning ? (c.fullName || '').split(' ')[0] : '';
+    document.getElementById('co-last').value = isReturning ? (c.fullName || '').split(' ').slice(1).join(' ') : '';
+    document.getElementById('co-phone').value = isReturning ? (c.phone || '') : '';
+    document.getElementById('co-email').value = bwState.email;
+    document.getElementById('co-sex').value = isReturning ? (c.sex || '') : '';
+    
+    if (isReturning && c.dob) {
+        try {
+            const d = new Date(c.dob);
+            if (!isNaN(d.getTime())) {
+                document.getElementById('co-dob').value = d.toISOString().split('T')[0];
+            }
+        } catch(e) {}
+    }
+    
+    // Render order summary
+    const total = bwState.cart.reduce((s, c) => s + c.price * c.quantity, 0);
+    document.getElementById('co-items').innerHTML = bwState.cart.map(c => `
+        <div class="flex justify-between text-sm py-2 border-b border-gray-100">
+            <span>${c.name}</span>
+            <span class="font-bold">$${c.price.toFixed(2)}</span>
+        </div>
+    `).join('');
+    document.getElementById('co-total').textContent = `$${total.toFixed(2)}`;
+}
+
+async function submitBloodworkOrder(e) {
+    e.preventDefault();
+    
+    const btn = document.getElementById('co-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:3px;display:inline-block;"></div> Processing...';
+    
+    const data = {
+        firstName: document.getElementById('co-first').value.trim(),
+        lastName: document.getElementById('co-last').value.trim(),
+        phone: document.getElementById('co-phone').value.trim(),
+        email: document.getElementById('co-email').value.trim(),
+        dob: document.getElementById('co-dob').value,
+        sex: document.getElementById('co-sex').value,
+        isReturning: !!bwState.customer,
+        items: bwState.cart.map(c => ({ name: c.name, price: c.price, quantity: c.quantity }))
+    };
+    
+    try {
+        const response = await callAppsScript('createBloodworkSession', data);
+        if (response.sessionId) {
+            const stripe = Stripe(CONFIG.STRIPE_PUBLIC_KEY);
+            await stripe.redirectToCheckout({ sessionId: response.sessionId });
+        } else {
+            throw new Error(response.error || 'Could not create checkout session.');
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+        btn.disabled = false;
+        btn.innerHTML = 'Proceed to Payment';
+    }
+}
+
+function goBackFromCheckout() {
+    bwState.step = 2;
+    renderStep();
+}
+
+function goBackFromCatalog() {
+    bwState.step = 1;
+    bwState.cart = [];
+    renderStep();
+}
+
+// Check for success param
+document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('success') === 'true') {
+        document.getElementById('bw-step-1').classList.add('hidden');
+        document.getElementById('bw-success').classList.remove('hidden');
+    }
+    
+    document.getElementById('bw-email').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') checkBwEmail();
+    });
+});
+</script>
+
+<!-- ======================== -->
+<!-- HEADER -->
+<!-- ======================== -->
+<div class="bg-white border-b border-gray-100 sticky top-0 z-40">
+    <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <a href="index.html" class="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            <span class="font-medium text-sm">Back to Booking</span>
+        </a>
+        <img src="https://img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/blob-e8d8a0e.png/:/cr=t:0%25,l:0%25,w:100%25,h:100%25/rs=w:400,h:100,cg:true" alt="DexaFit KC" class="h-10">
+    </div>
+</div>
+
+<!-- ======================== -->
+<!-- STEP 1: EMAIL -->
+<!-- ======================== -->
+<div id="bw-step-1" class="py-16 px-6">
+    <div class="max-w-xl mx-auto">
+        <div class="text-center mb-10">
+            <div class="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-xs font-bold px-4 py-2 rounded-full mb-4">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                BLOODWORK ORDERS
+            </div>
+            <h2 class="text-3xl font-black text-gray-900 mb-3">Order Bloodwork</h2>
+            <p class="text-gray-600">Enter your email to get started. If you've been in before, we'll pre-fill your info.</p>
+        </div>
+        <div class="glass-card rounded-3xl p-8 shadow-xl">
+            <div class="mb-6">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                <input type="email" id="bw-email" class="input-field w-full px-5 py-4 rounded-xl text-lg" placeholder="your@email.com">
+            </div>
+            <button id="bw-email-btn" onclick="checkBwEmail()" class="btn-primary w-full py-4 rounded-xl font-bold text-lg">Continue</button>
+        </div>
+    </div>
+</div>
+
+<!-- ======================== -->
+<!-- STEP 2: CATALOG -->
+<!-- ======================== -->
+<div id="bw-step-2" class="py-8 px-6 hidden">
+    <div class="max-w-5xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+            <button onclick="goBackFromCatalog()" class="flex items-center gap-2 text-gray-500 hover:text-gray-700">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                <span class="font-medium text-sm">Start Over</span>
+            </button>
+            <h2 class="text-xl font-bold">Select Bloodwork</h2>
+            <div></div>
+        </div>
+        
+        <!-- Category Tabs -->
+        <div id="cat-tabs" class="flex flex-wrap gap-2 mb-6 justify-center"></div>
+        
+        <!-- Search (Individual markers only) -->
+        <div class="mb-4">
+            <input type="text" id="bw-search" class="input-field w-full px-4 py-3 rounded-xl" placeholder="Search markers, panels, or kits..." oninput="filterItems(this.value)">
+        </div>
+        
+        <!-- Items Grid -->
+        <div id="bw-items" class="grid md:grid-cols-2 gap-3 mb-24"></div>
+        
+        <!-- Sticky Cart Summary -->
+        <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-2xl z-30 p-4">
+            <div class="max-w-5xl mx-auto">
+                <!-- Expandable cart details -->
+                <div id="cart-items-list" class="max-h-40 overflow-y-auto mb-3 hidden"></div>
+                <div class="flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <button onclick="toggleCartDetails()" class="flex items-center gap-2 text-gray-600 hover:text-gray-800">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                <span id="cart-count" class="font-bold text-blue-600">0</span>
+                            </div>
+                            <span class="text-sm font-medium">items</span>
+                        </button>
+                        <span id="cart-total" class="text-xl font-bold">$0.00</span>
+                    </div>
+                    <button id="cart-checkout-btn" onclick="proceedToCheckout()" disabled class="btn-primary px-8 py-3 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+                        Checkout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================== -->
+<!-- STEP 3: CHECKOUT FORM -->
+<!-- ======================== -->
+<div id="bw-step-3" class="py-8 px-6 hidden">
+    <div class="max-w-2xl mx-auto">
+        <button onclick="goBackFromCheckout()" class="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-6">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            <span class="font-medium text-sm">Back to Catalog</span>
+        </button>
+        
+        <h2 class="text-2xl font-bold mb-2">Complete Your Order</h2>
+        
+        <div class="flex gap-2 mb-6">
+            <span id="co-returning-badge" class="hidden text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold">Returning Customer</span>
+            <span id="co-new-badge" class="hidden text-xs bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-bold">New Customer</span>
+        </div>
+        
+        <form onsubmit="submitBloodworkOrder(event)">
+            <div class="glass-card rounded-2xl p-6 shadow-lg mb-6">
+                <h3 class="font-bold mb-4">Your Information</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">First Name *</label>
+                        <input type="text" id="co-first" class="input-field w-full px-4 py-3 rounded-xl" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Last Name *</label>
+                        <input type="text" id="co-last" class="input-field w-full px-4 py-3 rounded-xl" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Phone *</label>
+                        <input type="tel" id="co-phone" class="input-field w-full px-4 py-3 rounded-xl" required
+                               pattern="[0-9]*" inputmode="numeric" 
+                               oninput="this.value = this.value.replace(/[^0-9]/g, '');"
+                               placeholder="5551234567">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Email *</label>
+                        <input type="email" id="co-email" class="input-field w-full px-4 py-3 rounded-xl" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Date of Birth *</label>
+                        <input type="date" id="co-dob" class="input-field w-full px-4 py-3 rounded-xl" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Sex *</label>
+                        <select id="co-sex" class="input-field w-full px-4 py-3 rounded-xl" required>
+                            <option value="">Select...</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="glass-card rounded-2xl p-6 shadow-lg mb-6">
+                <h3 class="font-bold mb-4">Order Summary</h3>
+                <div id="co-items"></div>
+                <div class="flex justify-between mt-4 pt-4 border-t border-gray-200">
+                    <span class="font-bold text-lg">Total</span>
+                    <span id="co-total" class="font-bold text-lg text-blue-600">$0.00</span>
+                </div>
+            </div>
+            
+            <button type="submit" id="co-submit-btn" class="btn-primary w-full py-4 rounded-xl font-bold text-lg">
+                Proceed to Payment
+            </button>
+            <p class="text-xs text-gray-400 text-center mt-3">You'll be redirected to Stripe for secure payment.</p>
+        </form>
+    </div>
+</div>
+
+<!-- ======================== -->
+<!-- SUCCESS PAGE -->
+<!-- ======================== -->
+<div id="bw-success" class="py-16 px-6 hidden">
+    <div class="max-w-xl mx-auto text-center">
+        <div class="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
+            <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <h2 class="text-3xl font-black mb-3">Order Placed!</h2>
+        <p class="text-gray-600 mb-6">Your bloodwork order has been received. Our team will process it and reach out with next steps.</p>
+        <a href="index.html" class="btn-primary inline-block px-8 py-4 rounded-xl font-bold">Back to Booking</a>
+    </div>
+</div>
+
+<script>
+// Search/filter functionality
+function filterItems(query) {
+    const q = query.toLowerCase().trim();
+    const cards = document.querySelectorAll('#bw-items .bw-item');
+    cards.forEach(card => {
+        const text = card.textContent.toLowerCase();
+        card.style.display = text.includes(q) ? '' : 'none';
+    });
+}
+
+function toggleCartDetails() {
+    document.getElementById('cart-items-list').classList.toggle('hidden');
+}
+</script>
+
+</body>
+</html>
