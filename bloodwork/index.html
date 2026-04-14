@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DexaFit KC — Order Bloodwork</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://js.stripe.com/v3/"></script>
     <style>
@@ -166,18 +167,18 @@ const INDIVIDUAL_MARKERS = [
 ];
 
 const PANELS = [
-    { name: 'Marek Health Executive Panel', partner: 'Marek Health', extra: '45min review with coach', price: 569, desc: 'A comprehensive executive-level blood panel paired with a 45-minute coaching session to review results, optimize health strategies, and create an actionable plan.' },
-    { name: 'InsideTracker Ultimate Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 355, desc: 'The most comprehensive InsideTracker panel — tests dozens of biomarkers spanning heart health, metabolism, inflammation, hormones, and more, plus full platform access with personalized recommendations.' },
-    { name: 'InsideTracker Heart Health Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Focused on cardiovascular biomarkers including cholesterol, triglycerides, and inflammation markers to assess and optimize heart health.' },
-    { name: 'InsideTracker Inflammation Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Targets key inflammatory markers like hsCRP, helping you identify and reduce chronic inflammation linked to aging and disease.' },
-    { name: 'InsideTracker Cognition Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Measures biomarkers connected to brain health, cognitive performance, and neuroprotection for sharper mental function.' },
-    { name: 'InsideTracker Hormone Balance Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 157, desc: 'Evaluates key hormones including testosterone, cortisol, and thyroid markers to identify hormonal imbalances affecting energy, mood, and performance.' },
-    { name: 'InsideTracker Metabolism Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Focuses on metabolic biomarkers including glucose, insulin, and lipids to help optimize weight management and energy levels.' },
-    { name: 'InsideTracker Endurance Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Designed for athletes — measures biomarkers affecting aerobic capacity, oxygen transport, and recovery to fuel peak endurance.' },
-    { name: 'InsideTracker Sleep Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 157, desc: 'Analyzes biomarkers influencing sleep quality including cortisol, magnesium, and vitamin D to help you optimize rest and recovery.' },
-    { name: 'InsideTracker Recovery Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 157, desc: 'Measures markers of muscle damage, inflammation, and stress to help athletes and active individuals optimize their recovery.' },
-    { name: 'InsideTracker Fitness Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Tracks biomarkers tied to strength, body composition, and physical performance to guide your training and nutrition.' },
-    { name: 'InsideTracker Gut Health Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Evaluates markers related to gut barrier integrity, inflammation, and nutrient absorption for better digestive health.' }
+    { name: 'Marek Health Executive Panel', partner: 'Marek Health', extra: '45min review with coach', price: 569, desc: 'A comprehensive executive-level blood panel paired with a 45-minute coaching session to review results, optimize health strategies, and create an actionable plan.', url: 'https://www.marekhealth.com' },
+    { name: 'InsideTracker Ultimate Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 355, desc: 'The most comprehensive InsideTracker panel — tests dozens of biomarkers spanning heart health, metabolism, inflammation, hormones, and more, plus full platform access with personalized recommendations.', url: 'https://www.insidetracker.com/product/ultimate' },
+    { name: 'InsideTracker Heart Health Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Focused on cardiovascular biomarkers including cholesterol, triglycerides, and inflammation markers to assess and optimize heart health.', url: 'https://www.insidetracker.com/product/heart-health' },
+    { name: 'InsideTracker Inflammation Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Targets key inflammatory markers like hsCRP, helping you identify and reduce chronic inflammation linked to aging and disease.', url: 'https://www.insidetracker.com/product/inflammation' },
+    { name: 'InsideTracker Cognition Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Measures biomarkers connected to brain health, cognitive performance, and neuroprotection for sharper mental function.', url: 'https://www.insidetracker.com/product/cognition' },
+    { name: 'InsideTracker Hormone Balance Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 157, desc: 'Evaluates key hormones including testosterone, cortisol, and thyroid markers to identify hormonal imbalances affecting energy, mood, and performance.', url: 'https://www.insidetracker.com/product/hormone-balance' },
+    { name: 'InsideTracker Metabolism Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Focuses on metabolic biomarkers including glucose, insulin, and lipids to help optimize weight management and energy levels.', url: 'https://www.insidetracker.com/product/metabolism' },
+    { name: 'InsideTracker Endurance Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Designed for athletes — measures biomarkers affecting aerobic capacity, oxygen transport, and recovery to fuel peak endurance.', url: 'https://www.insidetracker.com/product/endurance' },
+    { name: 'InsideTracker Sleep Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 157, desc: 'Analyzes biomarkers influencing sleep quality including cortisol, magnesium, and vitamin D to help you optimize rest and recovery.', url: 'https://www.insidetracker.com/product/sleep' },
+    { name: 'InsideTracker Recovery Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 157, desc: 'Measures markers of muscle damage, inflammation, and stress to help athletes and active individuals optimize their recovery.', url: 'https://www.insidetracker.com/product/recovery' },
+    { name: 'InsideTracker Fitness Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Tracks biomarkers tied to strength, body composition, and physical performance to guide your training and nutrition.', url: 'https://www.insidetracker.com/product/fitness' },
+    { name: 'InsideTracker Gut Health Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 85, desc: 'Evaluates markers related to gut barrier integrity, inflammation, and nutrient absorption for better digestive health.', url: 'https://www.insidetracker.com/product/gut-health' }
 ];
 
 const AT_HOME_KITS = [
@@ -207,9 +208,33 @@ async function checkBwEmail() {
     const email = document.getElementById('bw-email').value.trim();
     if (!email || !email.includes('@')) { alert('Please enter a valid email.'); return; }
     
+    // Verify Turnstile
+    const turnstileResponse = document.querySelector('#bw-step-1 [name="cf-turnstile-response"]');
+    if (!turnstileResponse || !turnstileResponse.value) {
+        alert("Please complete the security check.");
+        return;
+    }
+    const token = turnstileResponse.value;
+    
     const btn = document.getElementById('bw-email-btn');
     btn.disabled = true;
-    btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:3px;"></div> Looking up...';
+    btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:3px;"></div> Verifying...';
+    
+    try {
+        const verification = await callAppsScript('verifyTurnstile', { token });
+        if (!verification.success) {
+            alert("Security verification failed. Please try again.");
+            if (window.turnstile) turnstile.reset();
+            btn.innerHTML = 'Continue';
+            btn.disabled = false;
+            return;
+        }
+    } catch (e) {
+        alert("Error verifying security. Try again later.");
+        btn.innerHTML = 'Continue';
+        btn.disabled = false;
+        return;
+    }
     
     bwState.email = email;
     
@@ -217,7 +242,7 @@ async function checkBwEmail() {
         const rows = await sbQuery(`customers?email=ilike.${encodeURIComponent(email)}&limit=1`);
         if (rows.length > 0) {
             const c = rows[0];
-            bwState.customer = { fullName: c.full_name, phone: c.phone, dob: c.dob, sex: c.sex, email: c.email };
+            bwState.customer = { id: c.id, fullName: c.full_name, phone: c.phone, dob: c.dob, sex: c.sex, email: c.email };
         } else {
             bwState.customer = null;
         }
@@ -273,48 +298,71 @@ function renderItems() {
     let items = [];
     
     if (bwState.activeCategory === 'individual') {
-        items = INDIVIDUAL_MARKERS.map(m => ({
-            id: `ind_${m.code}`,
-            html: `<div class="flex items-start justify-between gap-3">
-                <div class="flex-1 min-w-0">
-                    <h4 class="font-bold text-sm">${m.name} <span class="code-label">${m.code}</span></h4>
-                    <p class="text-xs text-gray-500 mt-1 line-clamp-2">${m.desc}</p>
-                </div>
-                <div class="text-right shrink-0">
-                    <span class="font-bold text-blue-600">$${m.price}</span>
-                </div>
-            </div>`,
-            name: `${m.name} (${m.code})`, price: m.price
-        }));
+        items = INDIVIDUAL_MARKERS.map(m => {
+            const isLong = m.desc.length > 80;
+            const shortDesc = isLong ? m.desc.substring(0, 80) + '...' : m.desc;
+            const descBlock = isLong
+                ? `<div class="text-xs text-gray-500 mt-1"><span class="bw-desc-short">${shortDesc}</span><span class="bw-desc-full hidden">${m.desc}</span> <button class="text-blue-500 hover:underline font-medium" onclick="event.stopPropagation(); toggleBwDesc(this)">Show more</button></div>`
+                : `<p class="text-xs text-gray-500 mt-1">${m.desc}</p>`;
+            return {
+                id: `ind_${m.code}`,
+                html: `<div class="flex items-start justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                        <h4 class="font-bold text-sm">${m.name} <span class="code-label">${m.code}</span></h4>
+                        ${descBlock}
+                    </div>
+                    <div class="text-right shrink-0">
+                        <span class="font-bold text-blue-600">$${m.price}</span>
+                    </div>
+                </div>`,
+                name: `${m.name} (${m.code})`, price: m.price
+            };
+        });
     } else if (bwState.activeCategory === 'panels') {
-        items = PANELS.map((p, i) => ({
-            id: `pnl_${i}`,
-            html: `<div class="flex items-start justify-between gap-3">
-                <div class="flex-1 min-w-0">
-                    <h4 class="font-bold text-sm">${p.name}</h4>
-                    <div class="powered-by mb-1">Powered by ${p.partner} <span class="review-tag">+ ${p.extra}</span></div>
-                    <p class="text-xs text-gray-500 mt-1 line-clamp-2">${p.desc}</p>
-                </div>
-                <div class="text-right shrink-0">
-                    <span class="font-bold text-blue-600">$${p.price.toFixed(2)}</span>
-                </div>
-            </div>`,
-            name: `${p.name} + ${p.extra}`, price: p.price
-        }));
+        items = PANELS.map((p, i) => {
+            const isLong = p.desc.length > 80;
+            const shortDesc = isLong ? p.desc.substring(0, 80) + '...' : p.desc;
+            const descBlock = isLong
+                ? `<div class="text-xs text-gray-500 mt-1"><span class="bw-desc-short">${shortDesc}</span><span class="bw-desc-full hidden">${p.desc}</span> <button class="text-blue-500 hover:underline font-medium" onclick="event.stopPropagation(); toggleBwDesc(this)">Show more</button></div>`
+                : `<p class="text-xs text-gray-500 mt-1">${p.desc}</p>`;
+            const learnLink = p.url ? `<a href="${p.url}" target="_blank" onclick="event.stopPropagation()" class="text-blue-500 text-xs font-semibold hover:underline mt-1 inline-block">Learn more at ${p.partner} →</a>` : '';
+            return {
+                id: `pnl_${i}`,
+                html: `<div class="flex items-start justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                        <h4 class="font-bold text-sm">${p.name}</h4>
+                        <div class="powered-by mb-1">Powered by ${p.partner} <span class="review-tag">+ ${p.extra}</span></div>
+                        ${descBlock}
+                        ${learnLink}
+                    </div>
+                    <div class="text-right shrink-0">
+                        <span class="font-bold text-blue-600">$${p.price.toFixed(2)}</span>
+                    </div>
+                </div>`,
+                name: `${p.name} + ${p.extra}`, price: p.price
+            };
+        });
     } else {
-        items = AT_HOME_KITS.map((k, i) => ({
-            id: `kit_${i}`,
-            html: `<div class="flex items-start justify-between gap-3">
-                <div class="flex-1 min-w-0">
-                    <h4 class="font-bold text-sm">${k.name}</h4>
-                    <p class="text-xs text-gray-500 mt-1 line-clamp-2">${k.desc}</p>
-                </div>
-                <div class="text-right shrink-0">
-                    <span class="font-bold text-blue-600">$${k.price.toFixed(2)}</span>
-                </div>
-            </div>`,
-            name: k.name, price: k.price
-        }));
+        items = AT_HOME_KITS.map((k, i) => {
+            const isLong = k.desc.length > 80;
+            const shortDesc = isLong ? k.desc.substring(0, 80) + '...' : k.desc;
+            const descBlock = isLong
+                ? `<div class="text-xs text-gray-500 mt-1"><span class="bw-desc-short">${shortDesc}</span><span class="bw-desc-full hidden">${k.desc}</span> <button class="text-blue-500 hover:underline font-medium" onclick="event.stopPropagation(); toggleBwDesc(this)">Show more</button></div>`
+                : `<p class="text-xs text-gray-500 mt-1">${k.desc}</p>`;
+            return {
+                id: `kit_${i}`,
+                html: `<div class="flex items-start justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                        <h4 class="font-bold text-sm">${k.name}</h4>
+                        ${descBlock}
+                    </div>
+                    <div class="text-right shrink-0">
+                        <span class="font-bold text-blue-600">$${k.price.toFixed(2)}</span>
+                    </div>
+                </div>`,
+                name: k.name, price: k.price
+            };
+        });
     }
     
     container.innerHTML = items.map(item => {
@@ -380,23 +428,33 @@ function renderCheckoutForm() {
     const c = bwState.customer;
     const isReturning = !!c;
     
-    document.getElementById('co-returning-badge').classList.toggle('hidden', !isReturning);
-    document.getElementById('co-new-badge').classList.toggle('hidden', isReturning);
+    document.getElementById('co-returning-section').classList.toggle('hidden', !isReturning);
+    document.getElementById('co-new-section').classList.toggle('hidden', isReturning);
     
-    // Pre-fill if returning
-    document.getElementById('co-first').value = isReturning ? (c.fullName || '').split(' ')[0] : '';
-    document.getElementById('co-last').value = isReturning ? (c.fullName || '').split(' ').slice(1).join(' ') : '';
-    document.getElementById('co-phone').value = isReturning ? (c.phone || '') : '';
+    // Always set email
     document.getElementById('co-email').value = bwState.email;
-    document.getElementById('co-sex').value = isReturning ? (c.sex || '') : '';
     
-    if (isReturning && c.dob) {
-        try {
-            const d = new Date(c.dob);
-            if (!isNaN(d.getTime())) {
-                document.getElementById('co-dob').value = d.toISOString().split('T')[0];
-            }
-        } catch(e) {}
+    if (isReturning) {
+        // Show only email confirmation for returning customers
+        document.getElementById('co-returning-email').textContent = bwState.email;
+        document.getElementById('co-returning-name').textContent = c.fullName || '';
+        
+        // Disable new customer required fields so form submits
+        ['co-first','co-last','co-phone','co-dob','co-sex'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.removeAttribute('required'); el.disabled = true; }
+        });
+    } else {
+        // New customer form — clear and enable fields
+        document.getElementById('co-first').value = '';
+        document.getElementById('co-last').value = '';
+        document.getElementById('co-phone').value = '';
+        document.getElementById('co-dob').value = '';
+        document.getElementById('co-sex').value = '';
+        ['co-first','co-last','co-phone','co-dob','co-sex'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.setAttribute('required', ''); el.disabled = false; }
+        });
     }
     
     // Render order summary
@@ -417,16 +475,23 @@ async function submitBloodworkOrder(e) {
     btn.disabled = true;
     btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:3px;display:inline-block;"></div> Processing...';
     
+    const isReturning = !!bwState.customer;
+    
     const data = {
-        firstName: document.getElementById('co-first').value.trim(),
-        lastName: document.getElementById('co-last').value.trim(),
-        phone: document.getElementById('co-phone').value.trim(),
         email: document.getElementById('co-email').value.trim(),
-        dob: document.getElementById('co-dob').value,
-        sex: document.getElementById('co-sex').value,
-        isReturning: !!bwState.customer,
+        isReturning: isReturning,
         items: bwState.cart.map(c => ({ name: c.name, price: c.price, quantity: c.quantity }))
     };
+    
+    // Only include new customer fields if new — also triggers saveCustomer in backend
+    if (!isReturning) {
+        data.firstName = document.getElementById('co-first').value.trim();
+        data.lastName = document.getElementById('co-last').value.trim();
+        data.phone = document.getElementById('co-phone').value.trim();
+        data.dob = document.getElementById('co-dob').value;
+        data.sex = document.getElementById('co-sex').value;
+        data.saveCustomer = true;
+    }
     
     try {
         const response = await callAppsScript('createBloodworkSession', data);
@@ -499,6 +564,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
                 <input type="email" id="bw-email" class="input-field w-full px-5 py-4 rounded-xl text-lg" placeholder="your@email.com">
             </div>
+            
+            <!-- TURNSTILE WIDGET -->
+            <div class="mb-4 flex justify-center"> 
+                <div class="cf-turnstile" data-sitekey="0x4AAAAAACe7Xzo-HnnSOxBi" data-theme="light" data-size="flexible"></div>
+            </div>
+            
             <button id="bw-email-btn" onclick="checkBwEmail()" class="btn-primary w-full py-4 rounded-xl font-bold text-lg">Continue</button>
         </div>
     </div>
@@ -563,47 +634,62 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="font-medium text-sm">Back to Catalog</span>
         </button>
         
-        <h2 class="text-2xl font-bold mb-2">Complete Your Order</h2>
-        
-        <div class="flex gap-2 mb-6">
-            <span id="co-returning-badge" class="hidden text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold">Returning Customer</span>
-            <span id="co-new-badge" class="hidden text-xs bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-bold">New Customer</span>
-        </div>
+        <h2 class="text-2xl font-bold mb-6">Complete Your Order</h2>
         
         <form onsubmit="submitBloodworkOrder(event)">
-            <div class="glass-card rounded-2xl p-6 shadow-lg mb-6">
-                <h3 class="font-bold mb-4">Your Information</h3>
-                <div class="grid md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">First Name *</label>
-                        <input type="text" id="co-first" class="input-field w-full px-4 py-3 rounded-xl" required>
+            <!-- Hidden email for form submission -->
+            <input type="hidden" id="co-email">
+            
+            <!-- RETURNING CUSTOMER: email-only confirmation -->
+            <div id="co-returning-section" class="hidden mb-6">
+                <div class="glass-card rounded-2xl p-6 shadow-lg">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        </div>
+                        <span class="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold">Returning Customer</span>
                     </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Last Name *</label>
-                        <input type="text" id="co-last" class="input-field w-full px-4 py-3 rounded-xl" required>
+                    <p class="text-sm text-gray-600 mb-1">Ordering as:</p>
+                    <p class="font-bold text-lg" id="co-returning-name"></p>
+                    <p class="text-gray-500 text-sm" id="co-returning-email"></p>
+                </div>
+            </div>
+            
+            <!-- NEW CUSTOMER: full form -->
+            <div id="co-new-section" class="hidden mb-6">
+                <div class="glass-card rounded-2xl p-6 shadow-lg">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="text-xs bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-bold">New Customer</span>
                     </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Phone *</label>
-                        <input type="tel" id="co-phone" class="input-field w-full px-4 py-3 rounded-xl" required
-                               pattern="[0-9]*" inputmode="numeric" 
-                               oninput="this.value = this.value.replace(/[^0-9]/g, '');"
-                               placeholder="5551234567">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Email *</label>
-                        <input type="email" id="co-email" class="input-field w-full px-4 py-3 rounded-xl" required>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Date of Birth *</label>
-                        <input type="date" id="co-dob" class="input-field w-full px-4 py-3 rounded-xl" required>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Sex *</label>
-                        <select id="co-sex" class="input-field w-full px-4 py-3 rounded-xl" required>
-                            <option value="">Select...</option>
-                            <option value="male">Male</option>
-                            <option value="female">Female</option>
-                        </select>
+                    <h3 class="font-bold mb-4">Your Information</h3>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">First Name *</label>
+                            <input type="text" id="co-first" class="input-field w-full px-4 py-3 rounded-xl" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Last Name *</label>
+                            <input type="text" id="co-last" class="input-field w-full px-4 py-3 rounded-xl" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Phone *</label>
+                            <input type="tel" id="co-phone" class="input-field w-full px-4 py-3 rounded-xl" required
+                                   pattern="[0-9]*" inputmode="numeric" 
+                                   oninput="this.value = this.value.replace(/[^0-9]/g, '');"
+                                   placeholder="5551234567">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Date of Birth *</label>
+                            <input type="date" id="co-dob" class="input-field w-full px-4 py-3 rounded-xl" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Sex *</label>
+                            <select id="co-sex" class="input-field w-full px-4 py-3 rounded-xl" required>
+                                <option value="">Select...</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -635,7 +721,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <h2 class="text-3xl font-black mb-3">Order Placed!</h2>
         <p class="text-gray-600 mb-6">Your bloodwork order has been received. Our team will process it and reach out with next steps.</p>
-        <a href="index.html" class="btn-primary inline-block px-8 py-4 rounded-xl font-bold">Back to Booking</a>
+        <a href="https://booking.dexafit.com" class="btn-primary inline-block px-8 py-4 rounded-xl font-bold">Back to Booking</a>
     </div>
 </div>
 
@@ -648,6 +734,21 @@ function filterItems(query) {
         const text = card.textContent.toLowerCase();
         card.style.display = text.includes(q) ? '' : 'none';
     });
+}
+
+function toggleBwDesc(btn) {
+    const wrapper = btn.parentElement;
+    const short = wrapper.querySelector('.bw-desc-short');
+    const full = wrapper.querySelector('.bw-desc-full');
+    if (full.classList.contains('hidden')) {
+        short.classList.add('hidden');
+        full.classList.remove('hidden');
+        btn.textContent = 'Show less';
+    } else {
+        short.classList.remove('hidden');
+        full.classList.add('hidden');
+        btn.textContent = 'Show more';
+    }
 }
 
 function toggleCartDetails() {
