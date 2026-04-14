@@ -695,6 +695,10 @@
                         <button onclick="showGiftCardModal()" class="btn-secondary w-full py-3 rounded-xl font-semibold text-sm text-gray-500 border-gray-300">
                             Buy Gift Cards
                         </button>
+
+                        <a href="bloodwork/" class="btn-secondary w-full py-3 rounded-xl font-semibold text-sm text-gray-500 border-gray-300 block text-center mt-3">
+                            Order Bloodwork
+                        </a>
                     </div>
                 </div>
             </div>
@@ -850,7 +854,10 @@
                                     </div>
                                     <div>
                                         <label class="block text-sm font-semibold text-gray-700 mb-2">Phone Number *</label>
-                                        <input type="tel" name="phone" id="input-phone" class="input-field w-full px-4 py-3 rounded-xl" required>
+                                        <input type="tel" name="phone" id="input-phone" class="input-field w-full px-4 py-3 rounded-xl" required 
+                                               pattern="[0-9]*" inputmode="numeric" 
+                                               oninput="this.value = this.value.replace(/[^0-9]/g, '');" 
+                                               placeholder="5551234567">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-semibold text-gray-700 mb-2">Date of Birth *</label>
@@ -1355,6 +1362,28 @@
             </div>
         </div>
     </div>
+    <!-- Consultation Review Question Modal -->
+    <div id="consultation-question-modal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-overlay absolute inset-0"></div>
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="modal-content glass-card rounded-3xl p-8 w-full max-w-lg relative z-10 text-center">
+                <div class="mb-6">
+                    <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                        </svg>
+                    </div>
+                    <h2 class="text-2xl font-bold mb-3">Would you like us to review your results with you?</h2>
+                    <p class="text-gray-600 text-sm leading-relaxed">This is a <span class="font-bold text-blue-600">free 15-minute add-on</span> where a team member walks through your test results with you.</p>
+                    <p class="text-gray-500 text-xs mt-2">If you already have a doctor reviewing your results or prefer to review them on your own, select "No thanks."</p>
+                </div>
+                <div class="flex gap-4">
+                    <button onclick="answerConsultation(false)" class="btn-secondary flex-1 py-4 rounded-xl font-bold text-base">No thanks</button>
+                    <button onclick="answerConsultation(true)" class="btn-primary flex-1 py-4 rounded-xl font-bold text-base">Yes, review my results!</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <!-- Add Credit Modal -->
     <div id="add-credit-modal" class="fixed inset-0 z-50 hidden">
         <div class="modal-overlay absolute inset-0" onclick="closeAddCreditModal()"></div>
@@ -1526,7 +1555,9 @@
                     <div class="grid md:grid-cols-2 gap-4 mb-4">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
-                            <input type="tel" id="edit-phone" class="input-field w-full px-4 py-3 rounded-xl">
+                            <input type="tel" id="edit-phone" class="input-field w-full px-4 py-3 rounded-xl" 
+                                   pattern="[0-9]*" inputmode="numeric" 
+                                   oninput="this.value = this.value.replace(/[^0-9]/g, '');">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Date of Birth</label>
@@ -2159,9 +2190,14 @@
                 }
             }
         
+            // Store ALL services (including consultation) for pricing/admin use
             state.services = servicesData;
+            
+            // Filter out consultation (id '6') from customer-facing service cards
+            // It will be offered as a separate question step instead
+            const customerFacingServices = servicesData.filter(s => s.id !== CONSULTATION_ID);
         
-            container.innerHTML = state.services.map(service => {
+            container.innerHTML = customerFacingServices.map(service => {
                 const shortDesc = service.description || '';
                 const isLong = shortDesc.length > 80;
                 const displayDesc = isLong ? shortDesc.substring(0, 80) + '...' : shortDesc;
@@ -2453,6 +2489,33 @@
         }
 
         function continueToSchedule() {
+            // Show the consultation review question before proceeding to schedule
+            showConsultationQuestion();
+        }
+        
+        function showConsultationQuestion() {
+            document.getElementById('consultation-question-modal').classList.remove('hidden');
+        }
+        
+        function answerConsultation(wantsReview) {
+            document.getElementById('consultation-question-modal').classList.add('hidden');
+            
+            if (wantsReview) {
+                // Auto-add consultation service if not already selected
+                if (!state.selectedServices.includes(CONSULTATION_ID)) {
+                    state.selectedServices.push(CONSULTATION_ID);
+                    updateOrderSummary();
+                }
+            } else {
+                // Remove consultation if it was somehow added
+                const idx = state.selectedServices.indexOf(CONSULTATION_ID);
+                if (idx > -1) {
+                    state.selectedServices.splice(idx, 1);
+                    updateOrderSummary();
+                }
+            }
+            
+            // Now proceed to schedule
             state.currentStep = 3;
             updateStepIndicators();
             showCurrentStep();
