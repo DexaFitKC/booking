@@ -454,9 +454,7 @@ async function sbQuery(path) {
     const res = await fetch(`${DB_API_URL}/${path}${separator}${cacheBust}`, {
         headers: {
             'X-Api-Key': DB_API_SECRET,
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store',
-            'Pragma': 'no-cache'
+            'Accept': 'application/json'
         }
     });
     if (!res.ok) throw new Error(`DB error: ${res.status}`);
