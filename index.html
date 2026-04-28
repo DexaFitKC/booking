@@ -445,21 +445,20 @@
     // ============================================
     // SUPABASE CONFIG
     // ============================================
-    const SUPABASE_URL = 'https://einvwopnfhjbydfumwzm.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpbnZ3b3BuZmhqYnlkZnVtd3ptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MjkwNDAsImV4cCI6MjA5MDIwNTA0MH0.AyJZ4_NNZs6i5_4hUtVl_KNf9JSl-b9ohxf343U61Xc';
-    
-    async function sbQuery(path) {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Accept': 'application/json'
-            }
-        });
-        if (!res.ok) throw new Error(`Supabase error: ${res.status}`);
-        const text = await res.text();
-        return text ? JSON.parse(text) : [];
-    }
+const DB_API_URL    = 'https://tmitlt.com/api/db.php';
+const DB_API_SECRET = 'dbread15544'; // same secret as db.php
+
+async function sbQuery(path) {
+    const res = await fetch(`${DB_API_URL}/${path}`, {
+        headers: {
+            'X-Api-Key': DB_API_SECRET,
+            'Accept': 'application/json'
+        }
+    });
+    if (!res.ok) throw new Error(`DB error: ${res.status}`);
+    const text = await res.text();
+    return text ? JSON.parse(text) : [];
+}
     
     // ============================================
     // SUPABASE DATA FUNCTIONS (replace callAppsScript for reads)
