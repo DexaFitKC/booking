@@ -3403,6 +3403,7 @@ async function sbQuery(path) {
         }
         
         async function loadAppointmentsForDate(dateStr) {
+            state.bookings = [];
             const date = new Date(dateStr + 'T00:00:00');
             document.getElementById('bookings-date-display').textContent = date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             
@@ -3596,6 +3597,8 @@ async function sbQuery(path) {
         }
 
         async function loadCheckoutSection() {
+            state.allDiscounts = null;        // Force fresh fetch
+            state.checkoutAppointments = [];
             const today = new Date();
             document.getElementById('checkout-date').value = today.toISOString().split('T')[0];
             
