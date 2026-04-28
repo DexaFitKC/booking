@@ -449,9 +449,7 @@ const DB_API_URL    = 'https://tmitlt.com/api/db.php';
 const DB_API_SECRET = 'dbread15544'; // same secret as db.php
 
 async function sbQuery(path) {
-    const cacheBust = `_cb=${Date.now()}`;
-    const separator = path.includes('?') ? '&' : '?';
-    const res = await fetch(`${DB_API_URL}/${path}${separator}${cacheBust}`, {
+    const res = await fetch(`${DB_API_URL}/${path}`, {
         headers: {
             'X-Api-Key': DB_API_SECRET,
             'Accept': 'application/json'
