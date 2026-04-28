@@ -443,21 +443,10 @@
 
   <script>
     // ============================================
-    // SUPABASE CONFIG
+    // DB CONFIG
     // ============================================
-const DB_API_URL    = 'https://tmitlt.com/api/db.php';
-const DB_API_SECRET = 'dbread15544'; // same secret as db.php
-
 async function sbQuery(path) {
-    const res = await fetch(`${DB_API_URL}/${path}`, {
-        headers: {
-            'X-Api-Key': DB_API_SECRET,
-            'Accept': 'application/json'
-        }
-    });
-    if (!res.ok) throw new Error(`DB error: ${res.status}`);
-    const text = await res.text();
-    return text ? JSON.parse(text) : [];
+    return await callAppsScript('dbQuery', { path });
 }
     
     // ============================================
