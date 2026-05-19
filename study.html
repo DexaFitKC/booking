@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+    DexaFit KC — Clinical Trial Check-In Form
+    ------------------------------------------
+    Simplified booking page for clinical trial participants who fill this out
+    in person on the day of their DEXA scan.
+
+    Flow:
+      1. Enter email (with Cloudflare Turnstile to prevent spam)
+      2a. If existing customer  -> H/W-change confirmation + standard checkboxes
+      2b. If new customer       -> Account info + standard checkboxes
+      3. Submit -> creates a $0 DEXA appointment at 07:30 AM (today) via the
+         existing createBooking Apps Script endpoint, then redirects to /success
+
+    All appointments are tagged with referrer="CLINICAL_TRIAL" for reporting.
+    The 07:30 AM time is intentional: it's before opening hours, so the booking
+    generates the PO and shows in records but doesn't block real time slots.
+-->
+<head>
+    <link rel="icon" href="//img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/favicon/808bdf2c-2a53-49a6-a0be-016f10978993/66bfdeea-79f7-45a9-881d-ecbc468da3e2.png/:/rs=w:16,h:16,m" sizes="16x16">
+    <link rel="icon" href="//img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/favicon/808bdf2c-2a53-49a6-a0be-016f10978993/66bfdeea-79f7-45a9-881d-ecbc468da3e2.png/:/rs=w:32,h:32,m" sizes="32x32">
+    <link rel="icon" href="//img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/favicon/808bdf2c-2a53-49a6-a0be-016f10978993/66bfdeea-79f7-45a9-881d-ecbc468da3e2.png/:/rs=w:48,h:48,m" sizes="48x48">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DexaFit KC — Clinical Trial Check-In</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-primary: #46A5FC;
+            --brand-secondary: #525252;
+            --brand-dark: #000000;
+            --brand-light: #FFFFFF;
+            --brand-primary-dark: #2d8ad9;
+            --brand-primary-light: #7ac0fd;
+        }
+
+        * { font-family: 'Montserrat', sans-serif; }
+
+        body {
+            background: var(--brand-light);
+            color: var(--brand-dark);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #46A5FC 0%, #1a6cb8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(70, 165, 252, 0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #46A5FC 0%, #2d8ad9 100%);
+            color: white;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(70, 165, 252, 0.3);
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(70, 165, 252, 0.4); }
+        .btn-primary:active { transform: translateY(0); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        .input-field {
+            border: 2px solid #e5e7eb;
+            transition: all 0.3s ease;
+        }
+        .input-field:focus {
+            border-color: var(--brand-primary);
+            box-shadow: 0 0 0 4px rgba(70, 165, 252, 0.1);
+            outline: none;
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #46A5FC;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .progress-step { position: relative; }
+
+        .question-item label {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .checkbox-custom {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            min-width: 24px;
+            border: 2px solid #616161;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            display: block;
+            background-color: white;
+        }
+        .checkbox-custom:checked {
+            background: #46A5FC;
+            border-color: #46A5FC;
+        }
+        .checkbox-custom:checked::after {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 3px;
+            width: 6px;
+            height: 12px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        .fade-in { animation: fadeIn 0.5s ease forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Configuration -->
+    <script>
+        const CONFIG = {
+            // Same Apps Script endpoint as the main booking page
+            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyUCDh4GLd3nHyxh7Mil5Q6HUXJASbUC6ihuWIa_4tyW5j0SXYyFa766Fax31AMqZwfWw/exec',
+        };
+
+        // Suppress noise from Turnstile/Cloudflare external scripts
+        window.onerror = function(message, source, lineno) {
+            if (lineno === 0 || (source && (source.includes('turnstile') || source.includes('challenges.cloudflare')))) {
+                console.warn("Suppressed external script error:", message);
+                return true;
+            }
+            console.error("JS Error:", message, "Line:", lineno);
+            return true;
+        };
+    </script>
+
+    <!-- Main App Container -->
+    <div id="app">
+        <div id="customer-booking" class="min-h-screen">
+
+            <!-- Header w/ progress -->
+            <div class="bg-white border-b border-gray-100 sticky top-0 z-40">
+                <div class="max-w-4xl mx-auto px-6 py-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <button onclick="goBack()" class="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                            </svg>
+                            <span class="font-medium">Back</span>
+                        </button>
+                        <div id="customer-name-display" class="hidden">
+                            <span class="text-sm text-gray-500">Welcome back,</span>
+                            <span id="welcome-name" class="font-semibold text-gray-900"></span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-center">
+                        <div class="flex items-center gap-4">
+                            <div class="progress-step flex items-center gap-2" id="step-1-indicator">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm step-circle bg-blue-500 text-white">1</div>
+                                <span class="hidden sm:inline font-medium">Email</span>
+                            </div>
+                            <div class="w-12 h-0.5 bg-gray-200"></div>
+                            <div class="progress-step flex items-center gap-2" id="step-2-indicator">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm step-circle bg-gray-200 text-gray-500">2</div>
+                                <span class="hidden sm:inline font-medium text-gray-400">Confirm</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 1: Email -->
+            <div id="booking-step-1" class="step-content py-16 px-6">
+                <div class="max-w-xl mx-auto">
+                    <div class="text-center mb-6">
+                        <img src="https://img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/blob-e8d8a0e.png/:/cr=t:0%25,l:0%25,w:100%25,h:100%25/rs=w:400,h:100,cg:true" alt="DexaFit KC Logo" class="h-12 inline-block">
+                    </div>
+                    <div class="text-center mb-10">
+                        <h2 class="text-3xl font-black text-gray-900 mb-3">Clinical Trial Check-In</h2>
+                        <p class="text-gray-600">Enter your email to get started with your DEXA scan.</p>
+                    </div>
+                    <div class="glass-card rounded-3xl p-8 shadow-xl">
+                        <div class="mb-6">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                            <input type="email" id="customer-email"
+                                   class="input-field w-full px-5 py-4 rounded-xl text-lg"
+                                   placeholder="your@email.com">
+                            <p id="email-error" class="text-red-500 text-sm mt-2 hidden">Please enter a valid email address</p>
+                        </div>
+
+                        <!-- TURNSTILE WIDGET -->
+                        <div class="mb-4 flex justify-center">
+                            <div class="cf-turnstile" data-sitekey="0x4AAAAAACe7Xzo-HnnSOxBi" data-theme="light" data-size="flexible"></div>
+                        </div>
+
+                        <button onclick="checkEmail()" class="btn-primary w-full py-4 rounded-xl font-bold text-lg">
+                            Continue
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Details / Confirm -->
+            <div id="booking-step-2" class="step-content py-16 px-6 hidden">
+                <div class="max-w-2xl mx-auto">
+                    <div class="text-center mb-6">
+                        <img src="https://img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/blob-e8d8a0e.png/:/cr=t:0%25,l:0%25,w:100%25,h:100%25/rs=w:400,h:100,cg:true" alt="DexaFit KC Logo" class="h-12 inline-block">
+                    </div>
+                    <div class="text-center mb-10">
+                        <h2 class="text-3xl font-black text-gray-900 mb-3">Almost There</h2>
+                        <p class="text-gray-600">Just a few more details before your DEXA scan.</p>
+                    </div>
+
+                    <div class="glass-card rounded-3xl p-8 shadow-xl">
+                        <form id="booking-details-form" onsubmit="submitBooking(event)">
+                            <!-- H/W changed section (existing customers only) -->
+                            <div id="hw-section" class="mb-6 p-4 bg-gray-50 rounded-xl">
+                                <p class="font-semibold mb-3">Have your height or weight changed since your last visit?</p>
+                                <div class="flex gap-4 mb-3">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="hw-changed" value="no" checked class="form-radio" onchange="toggleHWFields(false)">
+                                        <span>No</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="hw-changed" value="yes" class="form-radio" onchange="toggleHWFields(true)">
+                                        <span>Yes</span>
+                                    </label>
+                                </div>
+                                <div id="hw-fields" class="hidden grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Height</label>
+                                        <input type="text" name="height" id="input-height" class="input-field w-full px-4 py-3 rounded-xl" placeholder="e.g., 5'10">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Estimate Weight (lbs)</label>
+                                        <input type="number" name="weight" id="input-weight" class="input-field w-full px-4 py-3 rounded-xl" placeholder="e.g., 160">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- New customer fields (hidden for existing) -->
+                            <div id="new-customer-fields" class="hidden mb-6 pt-6 border-t border-gray-200">
+                                <h4 class="font-bold text-lg mb-4">Account Information</h4>
+                                <div class="grid md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
+                                        <input type="text" name="fullName" id="input-fullName" class="input-field w-full px-4 py-3 rounded-xl" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Phone Number *</label>
+                                        <input type="tel" name="phone" id="input-phone" class="input-field w-full px-4 py-3 rounded-xl" required
+                                               pattern="[0-9]*" inputmode="numeric"
+                                               oninput="this.value = this.value.replace(/[^0-9]/g, '');"
+                                               placeholder="5551234567">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Date of Birth *</label>
+                                        <input type="date" name="dob" id="input-dob" class="input-field w-full px-4 py-3 rounded-xl" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Sex *</label>
+                                        <select name="sex" id="input-sex" class="input-field w-full px-4 py-3 rounded-xl" required>
+                                            <option value="">Select...</option>
+                                            <option value="male">Male</option>
+                                            <option value="female">Female</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Height *</label>
+                                        <input type="text" name="heightNew" id="input-height-new" class="input-field w-full px-4 py-3 rounded-xl" placeholder="e.g., 5'10" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Weight (lbs) *</label>
+                                        <input type="number" name="weightNew" id="input-weight-new" class="input-field w-full px-4 py-3 rounded-xl" required>
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Ethnicity *</label>
+                                        <input type="text" name="ethnicity" id="input-ethnicity" class="input-field w-full px-4 py-3 rounded-xl" placeholder="Required for accurate comps/norms" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Dynamic Questions Container -->
+                            <div id="questions-container" class="space-y-6 mb-6">
+                                <!-- Questions populated by loadQuestions() -->
+                            </div>
+
+                            <button type="submit" class="btn-primary w-full py-4 rounded-xl font-bold text-lg">
+                                Confirm &amp; Submit
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // DEXA SERVICE + QUESTIONS (mirrors main booking page)
+        // ============================================
+        // We hard-code the DEXA scan because clinical-trial bookings are always
+        // and only this service. price/addonPrice are forced to 0 since the
+        // study covers the cost.
+        const DEXA_SERVICE = {
+            id: '1',
+            name: 'DEXA Body Composition Scan',
+            description: 'DEXA Body Composition Scan',
+            duration: 15,
+            price: 0,
+            addonPrice: 0,
+            addonDuration: 15,
+            excludedQuestions: ''
+        };
+
+        // Identical to the main page's HARDCODED_QUESTIONS array
+        const HARDCODED_QUESTIONS = [
+            { id: '5', type: 'short text', required: false, text: 'Briefly list any joint replacements (optional)', ask: 'every time' },
+            { id: '6', type: 'checkbox',   required: false, text: 'Check if you have hearing aids (optional)', ask: 'every time' },
+            { id: '1', type: 'checkbox',   required: true,  text: 'I am not pregnant, do not suspect I may be pregnant, and am not attempting to become pregnant. My weight does not exceed 350 pounds. I have not been administered gastrointestinal contrast or radionuclide agents within the previous 7 days.', ask: 'every time' },
+            { id: '2', type: 'checkbox',   required: true,  text: 'I have fully read the [waiver and consent form](https://dexafitkc.com/documents) and do consent to participate in the services rendered by QFit LLC dba DexaFit KC and/or DexaFit, LLC.', ask: 'every time' },
+            { id: '3', type: 'checkbox',   required: true,  text: 'I have fully read the [protocols page](https://dexafitkc.com/protocols) will properly prepare for my appointments.', ask: 'every time' },
+            { id: '4', type: 'long text',  required: false, text: 'Additional Notes:', ask: 'every time' }
+        ];
+
+        const state = {
+            currentStep: 1,
+            customerEmail: '',
+            existingCustomer: null,
+            questions: []
+        };
+
+        // ============================================
+        // API COMMUNICATION (subset of main page's helpers)
+        // ============================================
+        async function callAppsScript(action, data = {}) {
+            if (!CONFIG.APPS_SCRIPT_URL) {
+                throw new Error('Apps Script URL not configured');
+            }
+            try {
+                const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action, ...data })
+                });
+                const text = await response.text();
+                if (text.startsWith("<!DOCTYPE") || text.startsWith("<html")) {
+                    throw new Error("Server error. Try refreshing.");
+                }
+                const jsonData = JSON.parse(text);
+                if (jsonData.error) throw new Error(jsonData.error);
+                return jsonData;
+            } catch (error) {
+                console.error("Network/Parsing Error:", error);
+                throw error;
+            }
+        }
+
+        async function sbQuery(path) {
+            return await callAppsScript('dbQuery', { path });
+        }
+
+        async function sb_checkCustomer(email) {
+            const rows = await sbQuery(`customers?email=ilike.${encodeURIComponent(email)}&limit=1`);
+            if (rows.length === 0) return { exists: false };
+            const c = rows[0];
+            const customer = {
+                id: c.id, email: c.email, fullName: c.full_name,
+                phone: c.phone, sex: c.sex, dob: c.dob,
+                height: c.height, weight: c.weight, ethnicity: c.ethnicity, notes: c.notes
+            };
+            return { exists: true, customer };
+        }
+
+        // ============================================
+        // NAVIGATION + STATE
+        // ============================================
+        function validateEmail(email) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        }
+
+        function updateStepIndicators() {
+            for (let i = 1; i <= 2; i++) {
+                const indicator = document.getElementById(`step-${i}-indicator`);
+                const circle = indicator.querySelector('.step-circle');
+                const text = indicator.querySelector('span');
+
+                if (i < state.currentStep) {
+                    circle.classList.remove('bg-gray-200', 'text-gray-500', 'bg-blue-500');
+                    circle.classList.add('bg-green-500', 'text-white');
+                    circle.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                    if (text) text.classList.remove('text-gray-400');
+                } else if (i === state.currentStep) {
+                    circle.classList.remove('bg-gray-200', 'text-gray-500', 'bg-green-500');
+                    circle.classList.add('bg-blue-500', 'text-white');
+                    circle.textContent = i;
+                    if (text) text.classList.remove('text-gray-400');
+                } else {
+                    circle.classList.remove('bg-blue-500', 'text-white', 'bg-green-500');
+                    circle.classList.add('bg-gray-200', 'text-gray-500');
+                    circle.textContent = i;
+                    if (text) text.classList.add('text-gray-400');
+                }
+            }
+        }
+
+        function showCurrentStep() {
+            document.querySelectorAll('.step-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`booking-step-${state.currentStep}`).classList.remove('hidden');
+        }
+
+        function resetBookingState() {
+            state.currentStep = 1;
+            state.customerEmail = '';
+            state.existingCustomer = null;
+            state.questions = [];
+            document.getElementById('customer-email').value = '';
+            document.getElementById('customer-name-display').classList.add('hidden');
+            if (window.turnstile) {
+                try { turnstile.reset(); } catch (e) { /* no-op */ }
+            }
+        }
+
+        function goBack() {
+            if (state.currentStep > 1) {
+                state.currentStep--;
+                // Going back to step 1 — the prior Turnstile token has already
+                // been consumed by verifyTurnstile, so reset the widget so the
+                // user can re-verify if they try to continue again.
+                if (state.currentStep === 1 && window.turnstile) {
+                    try { turnstile.reset(); } catch (e) { /* no-op */ }
+                }
+                updateStepIndicators();
+                showCurrentStep();
+            } else {
+                window.location.href = 'https://dexafitkc.com';
+            }
+        }
+
+        // ============================================
+        // STEP 1: EMAIL CHECK
+        // ============================================
+        async function checkEmail() {
+            const email = document.getElementById('customer-email').value.trim();
+            const btn = document.querySelector('#booking-step-1 .btn-primary');
+
+            // Guard against double-submission (rapid clicks, Enter held down)
+            if (btn.disabled) return;
+
+            // 1. Validate email format
+            if (!validateEmail(email)) {
+                document.getElementById('email-error').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('email-error').classList.add('hidden');
+
+            // 2. Require Turnstile token
+            const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]');
+            if (!turnstileResponse || !turnstileResponse.value) {
+                alert("Please complete the security check.");
+                return;
+            }
+            const token = turnstileResponse.value;
+
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<div class="spinner"></div> Verifying...';
+            btn.disabled = true;
+
+            // 3. Verify Turnstile with backend
+            try {
+                const verification = await callAppsScript('verifyTurnstile', { token });
+                if (!verification.success) {
+                    alert("Security verification failed. Please try again.");
+                    if (window.turnstile) turnstile.reset();
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    return;
+                }
+            } catch (e) {
+                alert("Error verifying security. Try again later.");
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                return;
+            }
+
+            // 4. Look up customer
+            state.customerEmail = email;
+            btn.innerHTML = '<div class="spinner"></div> Loading...';
+            try {
+                const response = await sb_checkCustomer(email);
+                if (response.exists) {
+                    state.existingCustomer = response.customer;
+                    document.getElementById('welcome-name').textContent = response.customer.fullName;
+                    document.getElementById('customer-name-display').classList.remove('hidden');
+                } else {
+                    state.existingCustomer = null;
+                    document.getElementById('customer-name-display').classList.add('hidden');
+                }
+            } catch (error) {
+                console.error("Backend Connection Failed:", error);
+                // Continue regardless — treating as new customer is safer than blocking
+                state.existingCustomer = null;
+            }
+
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+
+            // 5. Advance to step 2
+            state.currentStep = 2;
+            updateStepIndicators();
+            showCurrentStep();
+            loadQuestions();
+        }
+
+        // ============================================
+        // STEP 2: QUESTIONS + DETAILS
+        // ============================================
+        function toggleHWFields(show) {
+            const fields = document.getElementById('hw-fields');
+            if (show) {
+                fields.classList.remove('hidden');
+                document.getElementById('input-height').value = '';
+                document.getElementById('input-weight').value = '';
+            } else {
+                fields.classList.add('hidden');
+            }
+        }
+
+        function loadQuestions() {
+            const container = document.getElementById('questions-container');
+            const newCustFields = document.getElementById('new-customer-fields');
+            const hwSection = document.getElementById('hw-section');
+
+            // DEXA has no excluded questions — render all of HARDCODED_QUESTIONS
+            state.questions = HARDCODED_QUESTIONS.slice();
+
+            // Toggle new-customer fields vs H/W-changed section
+            const fieldsToToggle = [
+                'input-fullName', 'input-phone', 'input-sex',
+                'input-dob', 'input-height-new', 'input-weight-new', 'input-ethnicity'
+            ];
+
+            if (!state.existingCustomer) {
+                newCustFields.classList.remove('hidden');
+                hwSection.classList.add('hidden');
+                fieldsToToggle.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.disabled = false;
+                        // Re-apply required (all are required for new customers)
+                        el.setAttribute('required', '');
+                    }
+                });
+            } else {
+                newCustFields.classList.add('hidden');
+                hwSection.classList.remove('hidden');
+                fieldsToToggle.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.disabled = true;            // disable so browser skips validation
+                        el.removeAttribute('required');
+                    }
+                });
+            }
+
+            container.innerHTML = state.questions.map(q => renderQuestion(q)).join('');
+        }
+
+        function renderQuestion(question) {
+            const inputId = `question-${question.id}`;
+            const requiredAttr = question.required ? 'required' : '';
+            const requiredStar = question.required ? '<span class="text-red-500">*</span>' : '';
+
+            let inputHtml = '';
+            let topLabelHtml = '';
+
+            switch (question.type) {
+                case 'short text':
+                    inputHtml = `<input type="text" id="${inputId}" name="${question.id}" class="input-field w-full px-4 py-3 rounded-xl" ${requiredAttr}>`;
+                    topLabelHtml = `<label class="block text-sm font-semibold text-gray-700 mb-2">${question.text} ${requiredStar}</label>`;
+                    break;
+                case 'long text':
+                    inputHtml = `<textarea id="${inputId}" name="${question.id}" class="input-field w-full px-4 py-3 rounded-xl" rows="4" ${requiredAttr}></textarea>`;
+                    topLabelHtml = `<label class="block text-sm font-semibold text-gray-700 mb-2">${question.text} ${requiredStar}</label>`;
+                    break;
+                case 'checkbox': {
+                    // Convert [text](url) markdown links + bare URLs into anchors
+                    let processedText = question.text;
+                    processedText = processedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-blue-600 underline hover:text-blue-800">$1</a>');
+                    processedText = processedText.replace(/(?<!href=")https?:\/\/[^\s<]+/g, '<a href="$&" target="_blank" class="text-blue-600 underline hover:text-blue-800">$&</a>');
+                    inputHtml = `
+                        <label class="flex items-start gap-3 cursor-pointer p-1">
+                            <input type="checkbox" id="${inputId}" name="${question.id}" class="checkbox-custom mt-1" ${requiredAttr}>
+                            <span class="text-gray-700">${processedText} ${requiredStar}</span>
+                        </label>
+                    `;
+                    break;
+                }
+                case 'number':
+                    inputHtml = `<input type="number" id="${inputId}" name="${question.id}" class="input-field w-full px-4 py-3 rounded-xl" ${requiredAttr}>`;
+                    topLabelHtml = `<label class="block text-sm font-semibold text-gray-700 mb-2">${question.text} ${requiredStar}</label>`;
+                    break;
+                case 'date':
+                    inputHtml = `<input type="date" id="${inputId}" name="${question.id}" class="input-field w-full px-4 py-3 rounded-xl" ${requiredAttr}>`;
+                    topLabelHtml = `<label class="block text-sm font-semibold text-gray-700 mb-2">${question.text} ${requiredStar}</label>`;
+                    break;
+            }
+
+            return `
+                <div class="question-item bg-gray-50 p-4 rounded-xl">
+                    ${topLabelHtml}
+                    ${inputHtml}
+                </div>
+            `;
+        }
+
+        // ============================================
+        // SUBMIT
+        // ============================================
+        function submitBooking(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+
+            // Prevent double-clicks
+            if (btn.disabled) return;
+
+            // URL params (optional study-specific override; default is CLINICAL_TRIAL)
+            const urlParams = new URLSearchParams(window.location.search);
+            const referrer = urlParams.get('ref') || 'CLINICAL_TRIAL';
+            const utmcont = urlParams.get('utm_content') || '';
+            const fbclid = urlParams.get('fbclid') || '';
+
+            // Manually validate required checkboxes (form-level validation
+            // doesn't always trigger reliably for required checkboxes inside
+            // dynamically rendered labels)
+            const requiredCheckboxes = document.querySelectorAll('#questions-container input[type="checkbox"][required]');
+            let allChecked = true;
+            requiredCheckboxes.forEach(cb => {
+                if (!cb.checked) {
+                    allChecked = false;
+                    cb.closest('.question-item').style.border = "2px solid red";
+                } else {
+                    cb.closest('.question-item').style.border = "none";
+                }
+            });
+            if (!allChecked) {
+                alert("Please check all required boxes before submitting.");
+                return;
+            }
+
+            btn.disabled = true;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:3px;"></div> Submitting...';
+
+            const formData = new FormData(e.target);
+            const customerData = {};
+            const questionResponses = {};
+
+            // Existing vs new customer
+            if (state.existingCustomer) {
+                const hwChanged = formData.get('hw-changed') === 'yes';
+                if (hwChanged) {
+                    customerData.height = formData.get('height');
+                    customerData.weight = formData.get('weight');
+                }
+                customerData.fullName = state.existingCustomer.fullName;
+                customerData.id = state.existingCustomer.id;
+            } else {
+                customerData.fullName = formData.get('fullName');
+                customerData.phone = formData.get('phone');
+                customerData.dob = formData.get('dob');
+                customerData.sex = formData.get('sex');
+                customerData.height = formData.get('heightNew');
+                customerData.weight = formData.get('weightNew');
+                customerData.ethnicity = formData.get('ethnicity');
+            }
+
+            // Question responses (everything that isn't a known customer-data key)
+            const customerKeys = new Set(['hw-changed', 'fullName', 'phone', 'dob', 'sex', 'heightNew', 'weightNew', 'ethnicity', 'height', 'weight']);
+            for (const [key, value] of formData.entries()) {
+                if (customerKeys.has(key)) continue;
+                if (value) questionResponses[key] = value;
+            }
+
+            // Force DEXA, $0, today, 07:30
+            const clinicalService = { ...DEXA_SERVICE, price: 0, addonPrice: 0 };
+            const today = new Date();   // captured at submit so date stays correct
+
+            const bookingData = {
+                customerEmail: state.customerEmail,
+                customerData,
+                isNewCustomer: !state.existingCustomer,
+                services: [clinicalService],
+                date: today.toISOString(),
+                time: '07:30',
+                duration: clinicalService.duration,
+                price: 0,
+                questionResponses,
+                referrer,
+                utmcont,
+                fbclid
+            };
+
+            callAppsScript('createBooking', bookingData)
+                .then(response => {
+                    if (response.success) {
+                        window.location.href = 'https://dexafitkc.com/success';
+                    } else {
+                        throw new Error(response.error || "Booking failed");
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("There was an error submitting your appointment. Please ask a staff member for help.");
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                });
+        }
+
+        // ============================================
+        // INIT
+        // ============================================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Enter-to-submit on the email field
+            const emailInput = document.getElementById('customer-email');
+            if (emailInput) {
+                emailInput.addEventListener('keypress', function (e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        checkEmail();
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
