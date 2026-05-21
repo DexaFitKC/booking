@@ -20,6 +20,8 @@
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://js.stripe.com/v3/"></script>
+    <!-- WORLD CUP PROMO (TEMPORARY) -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
     <!-- Meta Pixel Code -->
     <script>
     !function(f,b,e,v,n,t,s)
@@ -733,6 +735,8 @@ async function sbQuery(path) {
                                 <p class="text-sm text-gray-500">Estimated Cost</p>
                                 <p id="total-price" class="text-2xl font-bold">$0.00</p>
                                 <p id="credit-usage-note" class="text-sm text-green-600 hidden"></p>
+                                <!-- WORLD CUP PROMO (TEMPORARY) -->
+                                <p id="worldcup-promo-note" class="text-sm font-semibold text-green-600 hidden"></p>
                             </div>
                             <button onclick="continueToSchedule()" id="continue-schedule-btn" 
                                     class="btn-primary px-8 py-4 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed" 
@@ -1680,6 +1684,7 @@ async function sbQuery(path) {
         // ============================================
         let currentAdminPassword = null;
         const CLASS_A_IDS = ['1', '2', '3', '7'];
+         
         const HARDCODED_SERVICES = [
             { id: '1', name: 'DEXA Body Composition Scan', iconUrl: 'https://img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/DXA-7ef406f.png/:/cr=t:0%25,l:0%25,w:100%25,h:100%25/rs=w:165,h:165,cg:true', exampleReportUrl: 'https://dexafitkc.com/test-examples#35c7c428-3569-44e5-9201-26e4d5cf2a93', description: 'DEXA (or DXA) scans are the Gold Standard for body composition trusted by research & elite sports labs. FDA-approved technology uses low-dose radiation for body fat percentage (not BMI), total mass, lean tissue mass, bone mineral content (BMC), visceral fat mass, lean tissue mass symmetry, total body bone mineral density (BMD), plus.', duration: 15, price: 149, addonPrice: 139, addonDuration: 15, excludedQuestions: '' },
             { id: '2', name: 'RMR Resting Metabolic Rate | Fasted Test', iconUrl: 'https://img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/RMR-13296e7.png/:/cr=t:0%25,l:0%25,w:100%25,h:100%25/rs=w:165,h:165,cg:true', exampleReportUrl: 'https://dexafitkc.com/test-examples#1d0ca4ab-ede1-45bf-9c78-5bff823bafe2', description: 'RMR (gas exchange) represents the amount of calories you need to maintain essential functions at rest (things like heartbeat and breathing). Pinpointing the precise number of calories you burn at rest is crucial if you are trying to lose weight or build lean mass. The RMR test will analyze how efficient your body is at converting food to energy, whether you use more fat or sugar as fuel, & if you have a slowed metabolism.', duration: 20, price: 125, addonPrice: 115, addonDuration: 15, excludedQuestions: '1,5,6'},
@@ -1723,28 +1728,22 @@ async function sbQuery(path) {
             creditSearch: ''
         };
 
-        // Sample data for demo (in production, this comes from Google Sheets)
-        const sampleServices = [
-            { id: '1', name: 'Initial Consultation', description: 'Comprehensive health assessment and goal setting session', duration: 60, price: 150, addonPrice: 120, addonDuration: 45, excludedQuestions: '' },
-        ];
-
-        const sampleQuestions = [
-            { id: '1', type: 'short text', required: true, text: 'What are your primary health goals?', ask: 'every time' },
-            { id: '2', type: 'checkbox', required: false, text: 'I agree to the terms and conditions: https://example.com/terms', ask: 'once' },
-            { id: '3', type: 'long text', required: false, text: 'Please describe any current symptoms or concerns', ask: 'every time' },
-            { id: '4', type: 'number', required: true, text: 'Current weight (lbs)', ask: 'if has changed' },
-            { id: '5', type: 'date', required: false, text: 'Date of last physical exam', ask: 'once' },
-            { id: '6', type: 'short text', required: false, text: 'List any join replacements', ask: 'every time' },
-            { id: '7', type: 'checkbox', required: false, text: 'I have hearing aids', ask: 'every time' }
-        ];
-
-        const sampleCustomers = [
-            { id: '1', email: 'emily@example.com', fullName: 'Emily Davis', phone: '555-0103', sex: 'female', dob: '1988-11-08', height: '5\'4"', weight: '130', ethnicity: 'Hispanic', notes: 'Allergic to latex' }
-        ];
-
-        const sampleCredits = [
-            { id: '1', customerEmail: 'emily@example.com', name: 'Initial Consultation', value: 2, expiration: '2025-12-31', used: 0 },
-        ];
+        // ===== WORLD CUP PROMO (TEMPORARY) — delete this whole block to remove =====
+        const WORLD_CUP_PROMO_ENABLED  = true;          // ← flip to false to turn off instantly
+        const WORLD_CUP_PROMO_IDS      = ['1', '2', '3']; // DEXA, RMR, VO2 Max
+        const WORLD_CUP_PROMO_DISCOUNT = 50;            // dollars off
+        let   worldCupPromoWasQualified = false;        // internal: gates the confetti
+        function isWorldCupPromoQualified() {
+            return WORLD_CUP_PROMO_ENABLED &&
+                WORLD_CUP_PROMO_IDS.every(id => state.selectedServices.includes(id));
+        }
+        function fireWorldCupConfetti() {
+            if (typeof confetti !== 'function') return;
+            confetti({ particleCount: 90, spread: 70, angle: 60,  origin: { x: 0, y: 0.65 } });
+            confetti({ particleCount: 90, spread: 70, angle: 120, origin: { x: 1, y: 0.65 } });
+            setTimeout(() => confetti({ particleCount: 120, spread: 100, origin: { y: 0.6 } }), 200);
+        }
+        // ===== END WORLD CUP PROMO =====
 
         // ============================================
         // NAVIGATION
@@ -2439,6 +2438,26 @@ async function sbQuery(path) {
                     totalDuration += duration;
                 }
             });
+
+            // ===== WORLD CUP PROMO (TEMPORARY) =====
+            const promoNote = document.getElementById('worldcup-promo-note');
+            const promoQualified = isWorldCupPromoQualified();
+            if (promoQualified) {
+                const preDiscount = totalPrice;
+                totalPrice = Math.max(0, totalPrice - WORLD_CUP_PROMO_DISCOUNT);
+                if (promoNote) {
+                    promoNote.classList.remove('hidden');
+                    promoNote.innerHTML =
+                        `🌎⚽ World Cup Special — $${WORLD_CUP_PROMO_DISCOUNT} OFF the DEXA + RMR + VO2 Max bundle! ` +
+                        `<s class="text-gray-400 font-normal">$${preDiscount.toFixed(2)}</s> ` +
+                        `<span class="font-bold">$${totalPrice.toFixed(2)}</span>`;
+                }
+                if (!worldCupPromoWasQualified) fireWorldCupConfetti();
+            } else if (promoNote) {
+                promoNote.classList.add('hidden');
+            }
+            worldCupPromoWasQualified = promoQualified;
+            // ===== END WORLD CUP PROMO =====
         
             // 4. Gift Card Logic (Existing)
             const activeGC = state.giftCards.find(gc => gc.used < 1 && gc.name.toLowerCase() === 'gc');
