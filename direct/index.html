@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DexaFit KC - Schedule Your Appointment</title>
+    <link rel="icon" href="//img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/favicon/808bdf2c-2a53-49a6-a0be-016f10978993/66bfdeea-79f7-45a9-881d-ecbc468da3e2.png/:/rs=w:32,h:32,m" sizes="32x32">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-primary: #46A5FC;
+            --brand-secondary: #525252;
+            --brand-dark: #000000;
+            --brand-light: #FFFFFF;
+            --brand-primary-dark: #2d8ad9;
+        }
+        * { font-family: 'Montserrat', sans-serif; }
+        body { background: var(--brand-light); color: var(--brand-dark); }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #46A5FC 0%, #1a6cb8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(70, 165, 252, 0.2);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #46A5FC 0%, #2d8ad9 100%);
+            color: white;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(70, 165, 252, 0.3);
+        }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(70, 165, 252, 0.4);
+        }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary {
+            background: var(--brand-light);
+            color: var(--brand-secondary);
+            border: 2px solid var(--brand-primary);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-secondary:hover { background: var(--brand-primary); color: white; }
+        .input-field { border: 2px solid #e5e7eb; transition: all 0.3s ease; }
+        .input-field:focus {
+            border-color: var(--brand-primary);
+            box-shadow: 0 0 0 4px rgba(70, 165, 252, 0.1);
+            outline: none;
+        }
+        .time-slot { transition: all 0.2s ease; }
+        .time-slot:hover:not(.disabled) { background: var(--brand-primary); color: white; transform: scale(1.02); }
+        .time-slot.selected { background: var(--brand-primary); color: white; }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px; height: 36px; border-radius: 50%;
+            border-left-color: #46A5FC; animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .fade-in { animation: fadeIn 0.5s ease forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .checkbox-custom {
+            appearance: none; -webkit-appearance: none;
+            width: 24px; height: 24px; min-width: 24px;
+            border: 2px solid #616161; border-radius: 6px; cursor: pointer;
+            transition: all 0.2s ease; position: relative; display: block; background-color: white;
+        }
+        .checkbox-custom:checked { background: #46A5FC; border-color: #46A5FC; }
+        .checkbox-custom:checked::after {
+            content: ''; position: absolute; left: 7px; top: 3px;
+            width: 6px; height: 12px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg);
+        }
+        .loading-skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%; animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    </style>
+</head>
+<body>
+
+    <!-- =========================================================
+         CONFIGURATION  (mirrors your main booking site)
+    ========================================================== -->
+    <script>
+        const CONFIG = {
+            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyUCDh4GLd3nHyxh7Mil5Q6HUXJASbUC6ihuWIa_4tyW5j0SXYyFa766Fax31AMqZwfWw/exec'
+        };
+
+        // Service catalog — only the three direct-bookable services.
+        // IDs / names / durations match HARDCODED_SERVICES in the main site so
+        // createBooking + calendar blocking behave identically.
+        const SERVICE_CATALOG = {
+            DEXA: { id: '1', token: 'DEXA', name: 'DEXA Body Composition Scan',          shortName: 'DEXA Scan',   duration: 15, addonDuration: 15 },
+            VO2:  { id: '3', token: 'VO2',  name: 'VO2 Max Treadmill Test',              shortName: 'VO2 Max',     duration: 30, addonDuration: 25 },
+            RMR:  { id: '2', token: 'RMR',  name: 'RMR Resting Metabolic Rate | Fasted Test', shortName: 'RMR',     duration: 20, addonDuration: 15 }
+        };
+        // Canonical display order
+        const SERVICE_ORDER = ['DEXA', 'VO2', 'RMR'];
+
+        // Same waiver/health questions as the main site.
+        const HARDCODED_QUESTIONS = [
+            { id: '5', type: 'short text', required: false, text: 'Briefly list any joint replacements (optional)' },
+            { id: '6', type: 'checkbox',  required: false, text: 'Check if you have hearing aids (optional)' },
+            { id: '1', type: 'checkbox',  required: true,  text: 'I am not pregnant, do not suspect I may be pregnant, and am not attempting to become pregnant. My weight does not exceed 350 pounds. I have not been administered gastrointestinal contrast or radionuclide agents within the previous 7 days.' },
+            { id: '2', type: 'checkbox',  required: true,  text: 'I have fully read the [waiver and consent form](https://dexafitkc.com/documents) and do consent to participate in the services rendered by QFit LLC dba DexaFit KC and/or DexaFit, LLC.' },
+            { id: '3', type: 'checkbox',  required: true,  text: 'I have fully read the [protocols page](https://dexafitkc.com/protocols) will properly prepare for my appointments.' },
+            { id: '4', type: 'long text', required: false, text: 'Additional Notes:' }
+        ];
+        // Which questions each service wants hidden (matches main site excludedQuestions).
+        // A question is hidden only if EVERY selected service excludes it.
+        const SERVICE_EXCLUSIONS = {
+            '1': '',        // DEXA excludes nothing
+            '3': '1,5,6',   // VO2
+            '2': '1,5,6'    // RMR
+        };
+    </script>
+
+    <!-- Main container -->
+    <div class="min-h-screen">
+
+        <!-- Header / service titles -->
+        <div class="bg-white border-b border-gray-100 sticky top-0 z-40">
+            <div class="max-w-3xl mx-auto px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <button id="back-btn" onclick="goBack()" class="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors invisible">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                        <span class="font-medium">Back</span>
+                    </button>
+                    <img src="https://img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/blob-e8d8a0e.png/:/cr=t:0%25,l:0%25,w:100%25,h:100%25/rs=w:400,h:100,cg:true" alt="DexaFit KC" class="h-9">
+                    <div class="w-16"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Service banner -->
+        <div class="max-w-3xl mx-auto px-6 pt-10 text-center">
+            <p class="text-sm font-semibold uppercase tracking-wider text-blue-500 mb-2">Your Appointment</p>
+            <h1 id="service-title" class="text-3xl sm:text-4xl font-black gradient-text leading-tight">Loading…</h1>
+            <p id="service-sub" class="text-gray-500 mt-3">Let's get you scheduled.</p>
+        </div>
+
+        <!-- Invalid-link message -->
+        <div id="invalid-link" class="max-w-xl mx-auto px-6 py-16 text-center hidden">
+            <div class="glass-card rounded-3xl p-10 shadow-xl">
+                <h2 class="text-2xl font-bold text-gray-800 mb-3">This link isn't quite right</h2>
+                <p class="text-gray-600">It's missing a valid service. Please use the exact link we sent you, or contact us at
+                    <a href="mailto:kc@dexafit.com" class="text-blue-600 font-semibold">kc@dexafit.com</a> /
+                    <a href="tel:9134443141" class="text-blue-600 font-semibold">913.444.3141</a>.</p>
+            </div>
+        </div>
+
+        <!-- ======================= STEP 1: EMAIL ======================= -->
+        <div id="step-email" class="max-w-xl mx-auto px-6 py-12 hidden fade-in">
+            <div class="glass-card rounded-3xl p-8 shadow-xl">
+                <h2 class="text-xl font-bold text-gray-900 mb-1">Confirm your email</h2>
+                <p class="text-gray-500 text-sm mb-6">We'll attach your booking and confirmation to this address.</p>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                <input type="email" id="email-input" class="input-field w-full px-5 py-4 rounded-xl text-lg" placeholder="your@email.com">
+                <p id="email-error" class="text-red-500 text-sm mt-2 hidden">Please enter a valid email address.</p>
+                <div class="mt-5 flex justify-center">
+                    <div class="cf-turnstile" data-sitekey="0x4AAAAAACe7Xzo-HnnSOxBi" data-theme="light" data-size="flexible"></div>
+                </div>
+                <button id="email-continue" onclick="checkEmail()" class="btn-primary w-full py-4 rounded-xl font-bold text-lg mt-6">Continue</button>
+            </div>
+        </div>
+
+        <!-- ======================= STEP 2: SCHEDULE ======================= -->
+        <div id="step-schedule" class="max-w-3xl mx-auto px-6 py-12 hidden fade-in">
+            <div class="glass-card rounded-3xl p-6 sm:p-8 shadow-xl">
+                <h2 class="text-xl font-bold text-gray-900 mb-1">Pick a date &amp; time</h2>
+                <p id="schedule-duration" class="text-gray-500 text-sm mb-6"></p>
+
+                <div id="date-selector" class="grid grid-cols-7 gap-1.5 sm:gap-2 mb-6"></div>
+
+                <div id="time-slots-container" class="hidden">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-3">Available times</h3>
+                    <div id="time-slots" class="grid grid-cols-3 sm:grid-cols-5 gap-2"></div>
+                </div>
+
+                <button id="schedule-continue" onclick="continueToDetails()" disabled class="btn-primary w-full py-4 rounded-xl font-bold text-lg mt-8">Continue</button>
+            </div>
+        </div>
+
+        <!-- ======================= STEP 3: DETAILS / WAIVER ======================= -->
+        <div id="step-details" class="max-w-2xl mx-auto px-6 py-12 hidden fade-in">
+            <form id="details-form" onsubmit="submitBooking(event)">
+                <div class="glass-card rounded-3xl p-6 sm:p-8 shadow-xl">
+                    <h2 class="text-xl font-bold text-gray-900 mb-1">Your details</h2>
+                    <p class="text-gray-500 text-sm mb-6">Almost done — just a couple things before your visit.</p>
+
+                    <!-- New customer fields -->
+                    <div id="new-customer-fields" class="space-y-4 mb-6 hidden">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Full Name <span class="text-red-500">*</span></label>
+                            <input type="text" id="input-fullName" name="fullName" class="input-field w-full px-4 py-3 rounded-xl">
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Phone <span class="text-red-500">*</span></label>
+                                <input type="tel" id="input-phone" name="phone" class="input-field w-full px-4 py-3 rounded-xl">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Date of Birth</label>
+                                <input type="date" id="input-dob" name="dob" class="input-field w-full px-4 py-3 rounded-xl">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Sex <span class="text-red-500">*</span></label>
+                                <select id="input-sex" name="sex" class="input-field w-full px-4 py-3 rounded-xl bg-white">
+                                    <option value="">Select…</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Ethnicity</label>
+                                <input type="text" id="input-ethnicity" name="ethnicity" class="input-field w-full px-4 py-3 rounded-xl">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Height (in)</label>
+                                <input type="number" step="0.1" id="input-height-new" name="heightNew" class="input-field w-full px-4 py-3 rounded-xl">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Weight (lb)</label>
+                                <input type="number" step="0.1" id="input-weight-new" name="weightNew" class="input-field w-full px-4 py-3 rounded-xl">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Existing customer: optional H/W update -->
+                    <div id="hw-section" class="mb-6 hidden">
+                        <div class="p-4 bg-blue-50 rounded-xl">
+                            <p class="text-sm font-semibold text-gray-700 mb-3">Has your height or weight changed since your last visit?</p>
+                            <div class="flex gap-3 mb-3">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="hw-changed" value="no" checked onchange="toggleHWFields(false)"> <span>No</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="hw-changed" value="yes" onchange="toggleHWFields(true)"> <span>Yes</span>
+                                </label>
+                            </div>
+                            <div id="hw-fields" class="grid grid-cols-2 gap-4 hidden">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600 mb-1">Height (in)</label>
+                                    <input type="number" step="0.1" id="input-height" name="height" class="input-field w-full px-4 py-2 rounded-xl">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-600 mb-1">Weight (lb)</label>
+                                    <input type="number" step="0.1" id="input-weight" name="weight" class="input-field w-full px-4 py-2 rounded-xl">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Waiver / health questions -->
+                    <div id="questions-container" class="space-y-4 mb-6"></div>
+
+                    <button type="submit" class="btn-primary w-full py-4 rounded-xl font-bold text-lg">Complete Booking</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- ======================= SUCCESS ======================= -->
+        <div id="step-success" class="max-w-xl mx-auto px-6 py-16 hidden fade-in">
+            <div class="glass-card rounded-3xl p-10 shadow-xl text-center">
+                <div class="w-16 h-16 mx-auto mb-5 rounded-full bg-green-100 flex items-center justify-center">
+                    <svg class="w-9 h-9 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <h2 class="text-2xl font-black text-gray-900 mb-2">You're booked!</h2>
+                <div id="success-details" class="text-gray-600 text-left inline-block mt-4 space-y-1"></div>
+                <p class="text-gray-500 text-sm mt-6">A confirmation has been emailed to you. Redirecting…</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- =========================================================
+         SCRIPT
+    ========================================================== -->
+    <script>
+        // ---------- State ----------
+        const state = {
+            customerEmail: '',
+            existingCustomer: null,
+            selectedServices: [],   // array of catalog objects
+            selectedDate: null,
+            selectedTime: null,
+            totalDuration: 0,
+            questions: [],
+            currentWeekStart: new Date()
+        };
+
+        // ---------- API ----------
+        async function callAppsScript(action, data = {}) {
+            const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action, ...data })
+            });
+            const text = await response.text();
+            if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) throw new Error('Server error. Try refreshing.');
+            const json = JSON.parse(text);
+            if (json.error) throw new Error(json.error);
+            return json;
+        }
+        async function sbQuery(path) { return await callAppsScript('dbQuery', { path }); }
+
+        // Minimal existing-customer lookup (no credits needed for prepaid bookings)
+        async function checkCustomerExists(email) {
+            const rows = await sbQuery(`customers?email=ilike.${encodeURIComponent(email)}&limit=1`);
+            if (rows.length === 0) return { exists: false };
+            const c = rows[0];
+            return { exists: true, customer: { id: c.id, email: c.email, fullName: c.full_name } };
+        }
+
+        // ---------- Init: parse URL ----------
+        document.addEventListener('DOMContentLoaded', function () {
+            const params = new URLSearchParams(window.location.search);
+
+            // services param: robust to "+", spaces, commas, dashes, any case.
+            const raw = (params.get('services') || '').toUpperCase();
+            const tokens = SERVICE_ORDER.filter(t => raw.includes(t));
+            state.selectedServices = tokens.map(t => SERVICE_CATALOG[t]);
+
+            if (state.selectedServices.length === 0) {
+                document.getElementById('service-title').textContent = '';
+                document.getElementById('service-sub').classList.add('hidden');
+                document.getElementById('invalid-link').classList.remove('hidden');
+                return;
+            }
+
+            // Title = service short names
+            const titles = state.selectedServices.map(s => s.shortName);
+            const titleText = titles.length <= 2 ? titles.join(' + ') : titles.slice(0, -1).join(', ') + ' + ' + titles.slice(-1);
+            document.getElementById('service-title').textContent = titleText;
+            document.getElementById('service-sub').textContent =
+                state.selectedServices.length > 1 ? 'Schedule your appointment for these services.' : 'Schedule your appointment.';
+
+            // Duration (matches main-site bundling: 2+ services all use addon duration)
+            const multi = state.selectedServices.length >= 2;
+            state.totalDuration = state.selectedServices.reduce(
+                (sum, s) => sum + (multi ? s.addonDuration : s.duration), 0
+            );
+            document.getElementById('schedule-duration').textContent = `Appointment length: ${state.totalDuration} minutes`;
+
+            // Optional email autofill
+            const emailParam = params.get('email');
+            if (emailParam) document.getElementById('email-input').value = emailParam.trim();
+
+            // Show step 1
+            document.getElementById('step-email').classList.remove('hidden');
+        });
+
+        // ---------- Step navigation ----------
+        function showStep(step) {
+            ['step-email', 'step-schedule', 'step-details', 'step-success'].forEach(id =>
+                document.getElementById(id).classList.add('hidden'));
+            document.getElementById('step-' + step).classList.remove('hidden');
+            const back = document.getElementById('back-btn');
+            back.classList.toggle('invisible', step === 'email' || step === 'success');
+            state._step = step;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        function goBack() {
+            if (state._step === 'schedule') showStep('email');
+            else if (state._step === 'details') showStep('schedule');
+        }
+
+        // ---------- Step 1: email ----------
+        function validateEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+
+        async function checkEmail() {
+            const email = document.getElementById('email-input').value.trim();
+            const btn = document.getElementById('email-continue');
+            if (!validateEmail(email)) { document.getElementById('email-error').classList.remove('hidden'); return; }
+            document.getElementById('email-error').classList.add('hidden');
+
+            // Turnstile token
+            const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]');
+            if (!turnstileResponse || !turnstileResponse.value) { alert('Please complete the security check.'); return; }
+            const token = turnstileResponse.value;
+
+            const original = btn.innerHTML;
+            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:3px;"></div>';
+            btn.disabled = true;
+
+            // Verify Turnstile
+            try {
+                const verification = await callAppsScript('verifyTurnstile', { token });
+                if (!verification.success) {
+                    alert('Security verification failed. Please try again.');
+                    if (window.turnstile) turnstile.reset();
+                    btn.innerHTML = original; btn.disabled = false;
+                    return;
+                }
+            } catch (e) {
+                alert('Error verifying security. Please try again later.');
+                if (window.turnstile) turnstile.reset();
+                btn.innerHTML = original; btn.disabled = false;
+                return;
+            }
+
+            state.customerEmail = email;
+            try {
+                const res = await checkCustomerExists(email);
+                state.existingCustomer = res.exists ? res.customer : null;
+            } catch (e) {
+                console.error('Customer lookup failed:', e);
+                state.existingCustomer = null; // treat as new; booking still works
+            }
+            btn.innerHTML = original;
+            btn.disabled = false;
+
+            showStep('schedule');
+            renderCalendar();
+        }
+
+        // ---------- Step 2: schedule ----------
+        function renderCalendar() {
+            const dateSelector = document.getElementById('date-selector');
+            dateSelector.innerHTML = '';
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+            for (let i = 0; i < 14; i++) {
+                const date = new Date(state.currentWeekStart);
+                date.setDate(date.getDate() + i);
+                const isPast = date < today;
+                const isSelected = state.selectedDate && date.toDateString() === state.selectedDate.toDateString();
+                dateSelector.innerHTML += `
+                    <button class="aspect-square p-1 sm:p-3 rounded-xl text-center transition-all flex flex-col items-center justify-center ${isPast ? 'opacity-40 cursor-not-allowed' : 'hover:bg-blue-50'} ${isSelected ? 'bg-blue-500 text-white shadow-md' : ''}"
+                            onclick="${!isPast ? `selectDate(${date.getTime()})` : ''}" ${isPast ? 'disabled' : ''}>
+                        <div class="text-xs ${isSelected ? 'text-blue-100' : 'text-gray-500'}">${dayNames[date.getDay()]}</div>
+                        <div class="text-base sm:text-lg font-bold">${date.getDate()}</div>
+                    </button>`;
+            }
+        }
+
+        function selectDate(ts) {
+            state.selectedDate = new Date(ts);
+            state.selectedTime = null;
+            document.getElementById('schedule-continue').disabled = true;
+            renderCalendar();
+            loadTimeSlots();
+        }
+
+        async function loadTimeSlots() {
+            document.getElementById('time-slots-container').classList.remove('hidden');
+            const container = document.getElementById('time-slots');
+            container.innerHTML = '<div class="col-span-full text-center py-6"><div class="loading-skeleton h-12 rounded-lg mb-2"></div><p class="text-gray-500 text-sm">Loading available times…</p></div>';
+            try {
+                const res = await callAppsScript('getAvailability', {
+                    date: state.selectedDate.toISOString(),
+                    duration: state.totalDuration
+                });
+                renderTimeSlots(res.slots || []);
+            } catch (e) {
+                console.error(e);
+                renderTimeSlots([]);
+            }
+        }
+
+        function renderTimeSlots(slots) {
+            const container = document.getElementById('time-slots');
+            if (!slots.length) {
+                container.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">No available times for this date.</p>';
+                return;
+            }
+            container.innerHTML = slots.map(slot => `
+                <button class="time-slot p-3 rounded-xl border-2 border-gray-200 font-medium ${state.selectedTime === slot.time ? 'selected bg-blue-500 text-white' : ''}"
+                        onclick="selectTime('${slot.time}')">${formatTime(slot.time)}</button>`).join('');
+        }
+
+        function formatTime(time) {
+            const [h, m] = time.split(':');
+            const hour = parseInt(h);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const hour12 = hour % 12 || 12;
+            return `${hour12}:${m} ${ampm}`;
+        }
+
+        function selectTime(time) {
+            state.selectedTime = time;
+            document.querySelectorAll('.time-slot').forEach(b => {
+                b.classList.remove('selected');
+                if (b.textContent.trim() === formatTime(time)) b.classList.add('selected');
+            });
+            document.getElementById('schedule-continue').disabled = false;
+        }
+
+        function continueToDetails() {
+            if (!state.selectedDate || !state.selectedTime) { alert('Please choose a date and time.'); return; }
+            showStep('details');
+            loadQuestions();
+        }
+
+        // ---------- Step 3: details / waiver ----------
+        function toggleHWFields(show) {
+            const fields = document.getElementById('hw-fields');
+            if (show) {
+                fields.classList.remove('hidden');
+                document.getElementById('input-height').value = '';
+                document.getElementById('input-weight').value = '';
+            } else {
+                fields.classList.add('hidden');
+            }
+        }
+
+        function loadQuestions() {
+            const newCust = document.getElementById('new-customer-fields');
+            const hwSection = document.getElementById('hw-section');
+
+            if (state.existingCustomer) {
+                newCust.classList.add('hidden');
+                hwSection.classList.remove('hidden');
+                ['input-fullName', 'input-phone', 'input-sex'].forEach(id => document.getElementById(id).removeAttribute('required'));
+            } else {
+                newCust.classList.remove('hidden');
+                hwSection.classList.add('hidden');
+                ['input-fullName', 'input-phone', 'input-sex'].forEach(id => document.getElementById(id).setAttribute('required', ''));
+            }
+
+            // Exclusion logic: hide a question only if EVERY selected service excludes it
+            const selectedIds = state.selectedServices.map(s => s.id);
+            const total = selectedIds.length;
+            const counts = {};
+            selectedIds.forEach(id => {
+                (SERVICE_EXCLUSIONS[id] || '').split(',').map(x => x.trim()).filter(Boolean)
+                    .forEach(q => counts[q] = (counts[q] || 0) + 1);
+            });
+            state.questions = HARDCODED_QUESTIONS.filter(q => !(total > 0 && counts[q.id] === total));
+
+            document.getElementById('questions-container').innerHTML = state.questions.map(renderQuestion).join('');
+        }
+
+        function renderQuestion(q) {
+            const inputId = `question-${q.id}`;
+            const req = q.required ? 'required' : '';
+            const star = q.required ? '<span class="text-red-500">*</span>' : '';
+            let topLabel = '', input = '';
+            switch (q.type) {
+                case 'short text':
+                    input = `<input type="text" id="${inputId}" name="${q.id}" class="input-field w-full px-4 py-3 rounded-xl" ${req}>`;
+                    topLabel = `<label class="block text-sm font-semibold text-gray-700 mb-2">${q.text} ${star}</label>`; break;
+                case 'long text':
+                    input = `<textarea id="${inputId}" name="${q.id}" class="input-field w-full px-4 py-3 rounded-xl" rows="4" ${req}></textarea>`;
+                    topLabel = `<label class="block text-sm font-semibold text-gray-700 mb-2">${q.text} ${star}</label>`; break;
+                case 'checkbox':
+                    let t = q.text
+                        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-blue-600 underline hover:text-blue-800">$1</a>');
+                    input = `<label class="flex items-start gap-3 cursor-pointer p-1">
+                                <input type="checkbox" id="${inputId}" name="${q.id}" class="checkbox-custom mt-1" ${req}>
+                                <span class="text-gray-700">${t} ${star}</span>
+                             </label>`; break;
+            }
+            return `<div class="question-item bg-gray-50 p-4 rounded-xl">${topLabel}${input}</div>`;
+        }
+
+        function submitBooking(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            if (btn.disabled) return;
+
+            // Validate required checkboxes manually
+            let allChecked = true;
+            document.querySelectorAll('#questions-container input[type="checkbox"][required]').forEach(cb => {
+                if (!cb.checked) { allChecked = false; cb.closest('.question-item').style.border = '2px solid red'; }
+                else cb.closest('.question-item').style.border = 'none';
+            });
+            if (!allChecked) { alert('Please check all required boxes before booking.'); return; }
+
+            const original = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:3px;"></div> Booking…';
+
+            const fd = new FormData(e.target);
+            const customerData = {};
+            if (state.existingCustomer) {
+                if (fd.get('hw-changed') === 'yes') {
+                    customerData.height = fd.get('height');
+                    customerData.weight = fd.get('weight');
+                }
+                customerData.fullName = state.existingCustomer.fullName;
+                customerData.id = state.existingCustomer.id;
+            } else {
+                customerData.fullName = fd.get('fullName');
+                customerData.phone = fd.get('phone');
+                customerData.dob = fd.get('dob');
+                customerData.sex = fd.get('sex');
+                customerData.height = fd.get('heightNew');
+                customerData.weight = fd.get('weightNew');
+                customerData.ethnicity = fd.get('ethnicity');
+            }
+
+            const questionResponses = {};
+            const skip = ['hw-changed', 'fullName', 'phone', 'dob', 'sex', 'heightNew', 'weightNew', 'ethnicity', 'height', 'weight'];
+            for (const [k, v] of fd.entries()) { if (skip.includes(k)) continue; if (v) questionResponses[k] = v; }
+
+            const params = new URLSearchParams(window.location.search);
+            const bookingData = {
+                customerEmail: state.customerEmail,
+                customerData,
+                isNewCustomer: !state.existingCustomer,
+                // full service objects expected by createBooking (it reads s.name)
+                services: state.selectedServices.map(s => ({ id: s.id, name: s.name, price: 0, duration: s.duration })),
+                date: state.selectedDate.toISOString(),
+                time: state.selectedTime,
+                duration: state.totalDuration,
+                price: 0,                              // prepaid
+                questionResponses,
+                referrer: params.get('ref') || 'direct-link',
+                utmcont: params.get('utm_content') || '',
+                fbclid: params.get('fbclid') || ''
+            };
+
+            callAppsScript('createBooking', bookingData)
+                .then(res => {
+                    if (!res.success) throw new Error(res.error || 'Booking failed');
+                    window.dataLayer = window.dataLayer || [];
+                    window.dataLayer.push({
+                        event: 'BookingComplete', bookingEmail: res.email, bookingName: res.name,
+                        bookingService: res.service, bookingValue: 0, bookingId: res.bookingId
+                    });
+                    showSuccess();
+                    setTimeout(() => { window.location.href = 'https://dexafitkc.com/success'; }, 2500);
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('There was an error processing your booking. Please try again or contact us.');
+                    btn.innerHTML = original;
+                    btn.disabled = false;
+                });
+        }
+
+        function showSuccess() {
+            showStep('success');
+            document.getElementById('service-title').textContent = "All set!";
+            document.getElementById('service-sub').classList.add('hidden');
+            document.getElementById('success-details').innerHTML = `
+                <p><strong>Services:</strong> ${state.selectedServices.map(s => s.shortName).join(', ')}</p>
+                <p><strong>Date:</strong> ${state.selectedDate.toLocaleDateString()}</p>
+                <p><strong>Time:</strong> ${formatTime(state.selectedTime)}</p>
+                <p><strong>Duration:</strong> ${state.totalDuration} minutes</p>`;
+        }
+
+        // Enter key on email
+        document.getElementById('email-input').addEventListener('keypress', e => { if (e.key === 'Enter') checkEmail(); });
+    </script>
+</body>
+</html>
