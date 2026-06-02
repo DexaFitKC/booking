@@ -300,7 +300,9 @@
             selectedTime: null,
             totalDuration: 0,
             questions: [],
-            currentWeekStart: new Date()
+            currentWeekStart: new Date(),
+            prefillFullName: '',
+            prefillPhone: ''
         };
 
         // ---------- API ----------
@@ -359,6 +361,14 @@
             // Optional email autofill
             const emailParam = params.get('email');
             if (emailParam) document.getElementById('email-input').value = emailParam.trim();
+
+            // Optional new-customer prefill (first name, last name, phone).
+            // Applied to the final form only when the customer is new and the
+            // field is still empty — see loadQuestions().
+            const fiParam = (params.get('finame') || '').trim();
+            const laParam = (params.get('laname') || '').trim();
+            state.prefillFullName = [fiParam, laParam].filter(Boolean).join(' ');
+            state.prefillPhone = (params.get('phn') || '').trim();
 
             // Show step 1
             document.getElementById('step-email').classList.remove('hidden');
@@ -531,6 +541,13 @@
                 newCust.classList.remove('hidden');
                 hwSection.classList.add('hidden');
                 ['input-fullName', 'input-phone', 'input-sex'].forEach(id => document.getElementById(id).setAttribute('required', ''));
+
+                // Autofill name/phone from URL params (finame, laname, phn) if
+                // provided and not already filled in by the customer.
+                const nameField = document.getElementById('input-fullName');
+                const phoneField = document.getElementById('input-phone');
+                if (state.prefillFullName && !nameField.value) nameField.value = state.prefillFullName;
+                if (state.prefillPhone && !phoneField.value) phoneField.value = state.prefillPhone;
             }
 
             // Exclusion logic: hide a question only if EVERY selected service excludes it
