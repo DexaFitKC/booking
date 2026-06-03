@@ -1,29 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-<!--
-    DexaFit KC — Partner Clinic Booking
-    -----------------------------------
-    For partner clinics to book DEXA scans for their patients while the
-    patient is in the clinic room.
-
-    Flow:
-      1. Partner logs in with their clinic-specific password (Turnstile + the
-         new checkPartnerPassword Apps Script action). The action returns the
-         clinic display name, which is then used as the referrer.
-      2. Enter patient email; existing customers auto-fill.
-      3. Pick a date and time from real availability (DEXA, 15 min).
-      4. Confirm/complete patient info + waiver/consent boxes -> Submit.
-
-    Booking is sent via the existing createBooking endpoint with:
-      - service: DEXA, price=100
-      - referrer: clinic display name (e.g., "Tom's Clinic")
-      - partnerName: same value, sent separately so the backend can detect
-        a partner booking and auto-append "Customer of [clinic]" to the
-        appointment notes for the checkout staff.
-
-    Patient is never charged on this form. Checkout staff applies a 100%
-    partner discount; the clinic is invoiced separately.
--->
 <head>
     <link rel="icon" href="//img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/favicon/808bdf2c-2a53-49a6-a0be-016f10978993/66bfdeea-79f7-45a9-881d-ecbc468da3e2.png/:/rs=w:16,h:16,m" sizes="16x16">
     <link rel="icon" href="//img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/favicon/808bdf2c-2a53-49a6-a0be-016f10978993/66bfdeea-79f7-45a9-881d-ecbc468da3e2.png/:/rs=w:32,h:32,m" sizes="32x32">
