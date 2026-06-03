@@ -490,10 +490,14 @@
             state.currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
             // --- Total duration (matches main-site bundling: 2+ services use addon duration) ---
+            // Plus 15 minutes for the free data review/consultation included
+            // with every ad-driven booking. This propagates through the UI
+            // display, the getAvailability lookup, and the calendar event's
+            // duration so the slot is blocked off correctly.
             const multi = state.selectedServices.length >= 2;
             state.totalDuration = state.selectedServices.reduce(
                 (sum, s) => sum + (multi ? s.addonDuration : s.duration), 0
-            );
+            ) + 15;
 
             // --- Headline / subtext (XSS-safe via textContent) ---
             const headlineRaw = (params.get('headline') || '').trim().slice(0, 200);
