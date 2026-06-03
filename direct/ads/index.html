@@ -138,11 +138,12 @@
             </div>
         </div>
 
-        <!-- Invalid-link message (when required URL params are missing or bad) -->
+        <!-- Invalid-link / promo-expired message (title and body are set dynamically) -->
         <div id="invalid-link" class="max-w-xl mx-auto px-6 py-16 text-center hidden">
             <div class="glass-card rounded-3xl p-10 shadow-xl">
-                <h2 class="text-2xl font-bold text-gray-800 mb-3">This link isn't quite right</h2>
-                <p class="text-gray-600">It's missing required information. Please use the exact link from the ad, or contact us at
+                <h2 id="invalid-link-title" class="text-2xl font-bold text-gray-800 mb-3">This link isn't quite right</h2>
+                <p id="invalid-link-body" class="text-gray-600 mb-3">It's missing required information.</p>
+                <p class="text-gray-600">Please use the exact link from the ad, or contact us at
                     <a href="mailto:kc@dexafit.com" class="text-blue-600 font-semibold">kc@dexafit.com</a> /
                     <a href="tel:9134443141" class="text-blue-600 font-semibold">913.444.3141</a>.</p>
             </div>
@@ -195,6 +196,32 @@
             <div class="glass-card rounded-3xl p-6 sm:p-8 shadow-xl">
                 <h2 class="text-xl font-bold text-gray-900 mb-1">Pick a date &amp; time</h2>
                 <p id="schedule-duration" class="text-gray-500 text-sm mb-6"></p>
+
+                <!-- Month navigation -->
+                <div class="flex items-center justify-between mb-3">
+                    <button id="cal-prev" onclick="changeMonth(-1)" type="button"
+                            class="p-2 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            aria-label="Previous month">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <h3 id="cal-month-year" class="text-lg font-bold text-gray-900"></h3>
+                    <button id="cal-next" onclick="changeMonth(1)" type="button"
+                            class="p-2 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            aria-label="Next month">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+
+                <!-- Day-of-week header -->
+                <div class="grid grid-cols-7 gap-1.5 sm:gap-2 mb-2">
+                    <div class="text-center text-xs font-semibold text-gray-500">Sun</div>
+                    <div class="text-center text-xs font-semibold text-gray-500">Mon</div>
+                    <div class="text-center text-xs font-semibold text-gray-500">Tue</div>
+                    <div class="text-center text-xs font-semibold text-gray-500">Wed</div>
+                    <div class="text-center text-xs font-semibold text-gray-500">Thu</div>
+                    <div class="text-center text-xs font-semibold text-gray-500">Fri</div>
+                    <div class="text-center text-xs font-semibold text-gray-500">Sat</div>
+                </div>
 
                 <div id="date-selector" class="grid grid-cols-7 gap-1.5 sm:gap-2 mb-6"></div>
 
@@ -344,10 +371,11 @@
             selectedTime: null,
             totalDuration: 0,
             price: null,             // bundle price from ?price=
+            promoEnd: null,          // Date object — last selectable day, from ?promoEnd=
+            currentMonthStart: null, // First day of the month currently shown in the calendar
             headline: '',
             subtext: '',
             questions: [],
-            currentWeekStart: new Date(),
             prefillFullName: '',
             prefillPhone: '',
             _step: 'welcome'
@@ -411,6 +439,12 @@
             if (dur) dur.textContent = `Appointment length: ${state.totalDuration} minutes`;
         }
 
+        function showInvalid(title, body) {
+            document.getElementById('invalid-link-title').textContent = title;
+            document.getElementById('invalid-link-body').textContent = body;
+            document.getElementById('invalid-link').classList.remove('hidden');
+        }
+
         // ============================================
         // BOOT — parse URL params, validate, render welcome
         // ============================================
@@ -427,11 +461,33 @@
             const priceNum = priceRaw !== null && priceRaw !== '' ? parseFloat(priceRaw) : NaN;
             state.price = (isFinite(priceNum) && priceNum >= 0) ? priceNum : null;
 
+            // --- Promo end date (required) ---
+            // Accepts YYYY-MM-DD. Appending T23:59:59 forces local-time parsing
+            // (a bare YYYY-MM-DD is parsed as UTC midnight, which would clip a
+            // day off in Central Time). The cap is end-of-day on the promo date.
+            const promoEndRaw = (params.get('promoEnd') || '').trim();
+            let promoEndDate = null;
+            if (promoEndRaw) {
+                promoEndDate = new Date(promoEndRaw + 'T23:59:59');
+                if (isNaN(promoEndDate.getTime())) promoEndDate = null;
+            }
+
             // --- Required-params guard ---
-            if (state.selectedServices.length === 0 || state.price === null) {
-                document.getElementById('invalid-link').classList.remove('hidden');
+            if (state.selectedServices.length === 0 || state.price === null || !promoEndDate) {
+                showInvalid("This link isn't quite right", "It's missing required information.");
                 return;
             }
+
+            // --- Has the promo already ended? ---
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            if (promoEndDate < today) {
+                showInvalid('This Promo Has Expired', 'The booking window for this offer has ended. We may have another promotion you can take advantage of — reach out and we’ll help.');
+                return;
+            }
+            state.promoEnd = promoEndDate;
+
+            // --- Calendar starts on the current month ---
+            state.currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
             // --- Total duration (matches main-site bundling: 2+ services use addon duration) ---
             const multi = state.selectedServices.length >= 2;
@@ -536,39 +592,57 @@
         }
 
         // ============================================
-        // STEP 2: SCHEDULE (calendar + time slots)
+        // STEP 2: SCHEDULE (month-grid calendar + time slots)
         // ============================================
-        function getStartOfWeek(date) {
-            const d = new Date(date);
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1);  // Monday-based
-            return new Date(d.setDate(diff));
-        }
-
         function renderCalendar() {
-            // Reset week to current on first entry
-            if (!state.currentWeekStart) state.currentWeekStart = getStartOfWeek(new Date());
+            const monthStart = state.currentMonthStart;
+            const year  = monthStart.getFullYear();
+            const month = monthStart.getMonth();
+
+            // Header label
+            const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+            document.getElementById('cal-month-year').textContent = `${monthNames[month]} ${year}`;
+
+            const today = new Date(); today.setHours(0,0,0,0);
+            const firstDayOfWeek = new Date(year, month, 1).getDay();      // 0 = Sun
+            const daysInMonth    = new Date(year, month + 1, 0).getDate(); // last day of month
 
             const selector = document.getElementById('date-selector');
-            const today = new Date(); today.setHours(0,0,0,0);
-            const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-            const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
             selector.innerHTML = '';
-            for (let i = 0; i < 14; i++) {
-                const d = new Date(state.currentWeekStart);
-                d.setDate(d.getDate() + i);
-                const past = d < today;
-                const selected = state.selectedDate && d.toDateString() === state.selectedDate.toDateString();
+
+            // Leading blanks so day 1 lands in its weekday column
+            for (let i = 0; i < firstDayOfWeek; i++) {
+                selector.innerHTML += '<div></div>';
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const d = new Date(year, month, day);
+                const past       = d < today;
+                const afterPromo = d > state.promoEnd;
+                const disabled   = past || afterPromo;
+                const selected   = state.selectedDate && d.toDateString() === state.selectedDate.toDateString();
+
                 selector.innerHTML += `
-                    <button class="aspect-square p-1 sm:p-3 rounded-xl text-center transition-all flex flex-col items-center justify-center ${past ? 'opacity-40 cursor-not-allowed' : 'hover:bg-blue-50'} ${selected ? 'bg-blue-500 text-white shadow-md' : ''}"
-                            onclick="${past ? '' : `selectDate(${d.getTime()})`}"
-                            ${past ? 'disabled' : ''}>
-                        <div class="text-[10px] sm:text-xs ${selected ? 'text-blue-100' : 'text-gray-500'}">${dayNames[d.getDay()]}</div>
-                        <div class="text-base sm:text-lg font-bold leading-none mt-0.5">${d.getDate()}</div>
-                        <div class="text-[10px] sm:text-xs ${selected ? 'text-blue-100' : 'text-gray-400'} mt-0.5">${monthNames[d.getMonth()]}</div>
+                    <button type="button"
+                            class="aspect-square flex items-center justify-center rounded-xl text-sm sm:text-base font-medium transition-colors ${disabled ? 'opacity-30 cursor-not-allowed text-gray-400' : 'hover:bg-blue-50 text-gray-800'} ${selected ? 'bg-blue-500 text-white shadow-md hover:bg-blue-500' : ''}"
+                            onclick="${disabled ? '' : `selectDate(${d.getTime()})`}"
+                            ${disabled ? 'disabled' : ''}>
+                        ${day}
                     </button>`;
             }
+
+            // Disable nav buttons at boundaries
+            const todayMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            const promoMonth = new Date(state.promoEnd.getFullYear(), state.promoEnd.getMonth(), 1);
+            document.getElementById('cal-prev').disabled = monthStart <= todayMonth;
+            document.getElementById('cal-next').disabled = monthStart >= promoMonth;
+        }
+
+        function changeMonth(direction) {
+            const m = new Date(state.currentMonthStart);
+            m.setMonth(m.getMonth() + direction);
+            state.currentMonthStart = m;
+            renderCalendar();
         }
 
         function selectDate(ts) {
