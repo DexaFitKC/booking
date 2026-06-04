@@ -353,7 +353,7 @@
                 </div>
                 <h2 class="text-2xl font-black text-gray-900 mb-2">You're booked!</h2>
                 <div id="success-details" class="text-gray-600 text-left inline-block mt-4 space-y-1"></div>
-                <p class="text-gray-500 text-sm mt-6">A confirmation has been emailed to you. Redirecting…</p>
+                <p class="text-gray-500 text-sm mt-6">A confirmation has been emailed to you. See you soon!</p>
             </div>
         </div>
 
@@ -930,8 +930,27 @@
                         bookingValue: state.price,
                         bookingId: res.bookingId
                     });
+                    try {
+                        var d = {
+                            event: "BookingComplete",
+                            bookingEmail: res.email,
+                            bookingName: res.name,
+                            bookingService: res.service,
+                            bookingValue: state.price,
+                            bookingId: res.bookingId
+                        };
+                        window.top.postMessage(JSON.stringify(d), "*");
+                    } catch (e) {
+                        console.log(e);
+                    }
                     showSuccess();
-                    setTimeout(() => { window.location.href = 'https://dexafitkc.com/success'; }, 2500);
+                    setTimeout(() => {
+                        try {
+                            window.top.location.href = 'https://dexafitkc.com/success';
+                        } catch (e) {
+                            console.log('Top-window redirect blocked; staying on the in-iframe success card.', e);
+                        }
+                    }, 2500);
                 })
                 .catch(err => {
                     console.error(err);
