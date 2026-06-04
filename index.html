@@ -1235,14 +1235,14 @@ async function sbQuery(path) {
 
                 <!-- Toggle -->
                 <div class="flex justify-center mb-6">
-                    <div class="bg-gray-100 rounded-xl p-1 inline-flex">
-                        <button id="btn-toggle-packages" onclick="togglePkgView('packages')" class="px-6 py-2 rounded-lg font-semibold text-sm bg-white shadow">Packages</button>
-                        <button id="btn-toggle-memberships" onclick="togglePkgView('memberships')" class="px-6 py-2 rounded-lg font-semibold text-sm text-gray-500">Memberships</button>
-                    </div>
+                        <div class="bg-gray-100 rounded-xl p-1 inline-flex">
+                                <button id="btn-toggle-memberships" onclick="togglePkgView('memberships')" class="px-6 py-2 rounded-lg font-semibold text-sm bg-white shadow">Memberships</button>
+                                <button id="btn-toggle-packages" onclick="togglePkgView('packages')" class="px-6 py-2 rounded-lg font-semibold text-sm text-gray-500">Packages</button>
+                        </div>
                 </div>
 
                 <!-- Manage Memberships Link (Hidden for Packages) -->
-                <div id="manage-membership-link" class="hidden text-center mb-4">
+                <div id="manage-membership-link" class="text-center mb-4">
                     <a href="#" onclick="goToPortal()" class="text-blue-600 hover:underline text-sm">Manage my existing memberships</a>
                 </div>
 
@@ -4845,7 +4845,7 @@ async function sbQuery(path) {
             try {
                 const response = await sb_getPackages();
                 state.allPackages = response.packages || [];
-                togglePkgView('packages'); 
+                togglePkgView('memberships');
             } catch(e) {
                 document.getElementById('packages-list-container').innerHTML = '<p class="text-red-500 text-center">Error loading packages.</p>';
             }
