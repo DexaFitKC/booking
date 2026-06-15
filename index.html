@@ -497,7 +497,10 @@ async function sbQuery(path) {
             path = `customers?or=(full_name.ilike.${q},email.ilike.${q},phone.ilike.${q})&order=id.desc&limit=${limit}&offset=${offset}`;
         }
         // Use HEAD to get total count for hasMore
+        console.log('dbQuery path:', path);
+        // Use HEAD to get total count for hasMore
         const rows = await sbQuery(path);
+        console.log('dbQuery rows:', rows);
         const customers = rows.map(r => ({
             id: r.id, email: r.email, fullName: r.full_name,
             phone: r.phone, sex: r.sex, dob: r.dob,
