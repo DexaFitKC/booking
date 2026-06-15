@@ -496,11 +496,7 @@ async function sbQuery(path) {
             const q = encodeURIComponent(`%${searchQuery}%`);
             path = `customers?or=(full_name.ilike.${q},email.ilike.${q},phone.ilike.${q})&order=id.desc&limit=${limit}&offset=${offset}`;
         }
-        // Use HEAD to get total count for hasMore
-        console.log('dbQuery path:', path);
-        // Use HEAD to get total count for hasMore
         const rows = await sbQuery(path);
-        console.log('dbQuery rows:', rows);
         const customers = rows.map(r => ({
             id: r.id, email: r.email, fullName: r.full_name,
             phone: r.phone, sex: r.sex, dob: r.dob,
@@ -3090,23 +3086,32 @@ async function sbQuery(path) {
             }
         }
         
+        let customerSearchToken = 0;
+
         async function searchCustomers(query) {
             state.customerSearch = query;
             state.customerPage = 0;
-            
+        
+            const myToken = ++customerSearchToken;
+        
             const tbody = document.getElementById('customers-table-body');
             const loadMoreDiv = document.getElementById('load-more-customers-btn');
-            
+        
             tbody.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-gray-500">Searching...</td></tr>';
-            
+        
             try {
                 const response = await sb_getCustomers(state.customerPage, query);
+        
+                // Ignore stale responses from outdated searches
+                if (myToken !== customerSearchToken) return;
+        
                 state.customers = response.customers || [];
-                
+        
                 renderCustomerRows(state.customers);
                 if (loadMoreDiv) loadMoreDiv.classList.toggle('hidden', !response.hasMore);
-                
+        
             } catch (e) {
+                if (myToken !== customerSearchToken) return;
                 console.error(e);
                 tbody.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-red-500">Error searching.</td></tr>';
             }
