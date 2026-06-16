@@ -2460,7 +2460,7 @@ async function sbQuery(path) {
         
             // 4. Gift Card Logic (Existing)
             const activeGC = state.giftCards.find(gc => gc.used < 1 && gc.name.toLowerCase() === 'gc');
-            let gcTotal = activeGC ? activeGC.value : 0;
+            let gcTotal = activeGC ? (Number(activeGC.value) || 0) : 0;
             let gcApplied = 0;
         
             if (activeGC) {
