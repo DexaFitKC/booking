@@ -761,13 +761,13 @@ async function sbQuery(path) {
                     <div class="glass-card rounded-3xl p-8 shadow-xl">
                         <!-- Calendar Navigation -->
                         <div class="flex items-center justify-between mb-6">
-                            <button onclick="changeWeek(-1)" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                            <button id="cal-prev-btn" onclick="changeMonth(-1)" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                                 </svg>
                             </button>
                             <h3 id="calendar-month" class="text-xl font-bold"></h3>
-                            <button onclick="changeWeek(1)" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                            <button onclick="changeMonth(1)" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                                 </svg>
@@ -1710,7 +1710,7 @@ async function sbQuery(path) {
             selectedServices: [],
             selectedDate: null,
             selectedTime: null,
-            currentWeekStart: new Date(),
+            currentMonth: new Date(),
             totalDuration: 0,
             totalPrice: 0,
             credits: [],
@@ -1810,8 +1810,8 @@ async function sbQuery(path) {
                 if (state.currentStep === 3) {
                     state.selectedDate = null;
                     state.selectedTime = null;
-                    // Reset to current week so they don't get stuck on a far-future week
-                    state.currentWeekStart = getStartOfWeek(new Date());
+                    // Reset to current month so they don't get stuck on a far-future month
+                    state.currentMonth = new Date();
                 }
                 
                 state.currentStep--;
@@ -2530,7 +2530,7 @@ async function sbQuery(path) {
         }
 
         function loadCalendar() {
-            state.currentWeekStart = getStartOfWeek(new Date());
+            state.currentMonth = new Date();
             
             // Explicitly hide the time slots container when loading the calendar
             const tsContainer = document.getElementById('time-slots-container');
@@ -2539,47 +2539,69 @@ async function sbQuery(path) {
             renderCalendar();
         }
 
-        function getStartOfWeek(date) {
-            const d = new Date(date);
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-            return new Date(d.setDate(diff));
-        }
+        function changeMonth(direction) {
+            const anchor = state.currentMonth || new Date();
+            const target = new Date(anchor.getFullYear(), anchor.getMonth() + direction, 1);
 
-        function changeWeek(direction) {
-            state.currentWeekStart.setDate(state.currentWeekStart.getDate() + (direction * 7));
+            // Never navigate to a month earlier than the current one
+            const now = new Date();
+            const firstOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            if (target < firstOfThisMonth) return;
+
+            state.currentMonth = target;
             renderCalendar();
         }
 
         function renderCalendar() {
             const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-            document.getElementById('calendar-month').textContent = `${monthNames[state.currentWeekStart.getMonth()]} ${state.currentWeekStart.getFullYear()}`;
-        
+            const anchor = state.currentMonth || new Date();
+            const year = anchor.getFullYear();
+            const month = anchor.getMonth();
+
+            document.getElementById('calendar-month').textContent = `${monthNames[month]} ${year}`;
+
             const dateSelector = document.getElementById('date-selector');
             dateSelector.innerHTML = ''; // Clear
-            
+
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-        
-            // Render 14 days (2 weeks) instead of 7
-            for (let i = 0; i < 14; i++) {
-                const date = new Date(state.currentWeekStart);
-                date.setDate(date.getDate() + i);
+
+            // Weekday header row (Monday-first to match the business week)
+            const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            dayNames.forEach(dn => {
+                dateSelector.innerHTML += `<div class="text-center text-xs font-semibold text-gray-400 pb-1">${dn}</div>`;
+            });
+
+            // Blank leading cells so the 1st lands under the correct weekday
+            const firstOfMonth = new Date(year, month, 1);
+            const offset = (firstOfMonth.getDay() + 6) % 7; // Mon = 0 ... Sun = 6
+            for (let i = 0; i < offset; i++) {
+                dateSelector.innerHTML += `<div></div>`;
+            }
+
+            // One button per day of the month
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
+                const date = new Date(year, month, dayNum);
                 const isPast = date < today;
                 const isSelected = state.selectedDate && date.toDateString() === state.selectedDate.toDateString();
-                const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        
-                // Simple grid layout handling for 14 items
-                // Apply a grid class to the container in HTML: "grid-cols-7"
-                
+
                 dateSelector.innerHTML += `
-                    <button class="aspect-square p-1 sm:p-4 rounded-xl text-center transition-all flex flex-col items-center justify-center ${isPast ? 'opacity-40 cursor-not-allowed' : 'hover:bg-blue-50'} ${isSelected ? 'bg-blue-500 text-white shadow-md' : ''}"
+                    <button class="aspect-square p-1 sm:p-2 rounded-xl text-center transition-all flex items-center justify-center ${isPast ? 'opacity-40 cursor-not-allowed' : 'hover:bg-blue-50'} ${isSelected ? 'bg-blue-500 text-white shadow-md' : ''}"
                             onclick="${!isPast ? `selectDate(${date.getTime()})` : ''}"
                             ${isPast ? 'disabled' : ''}>
-                        <div class="text-xs ${isSelected ? 'text-blue-100' : 'text-gray-500'}">${dayNames[date.getDay()]}</div>
-                        <div class="text-base sm:text-lg font-bold">${date.getDate()}</div>
+                        <div class="text-base sm:text-lg font-bold">${dayNum}</div>
                     </button>
                 `;
+            }
+
+            // Grey out the back arrow when already on the current month
+            const prevBtn = document.getElementById('cal-prev-btn');
+            if (prevBtn) {
+                const atCurrentMonth = (year === today.getFullYear() && month === today.getMonth());
+                prevBtn.disabled = atCurrentMonth;
+                prevBtn.classList.toggle('opacity-30', atCurrentMonth);
+                prevBtn.classList.toggle('cursor-not-allowed', atCurrentMonth);
             }
         }
 
