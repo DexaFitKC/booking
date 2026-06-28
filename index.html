@@ -2849,6 +2849,47 @@ async function sbQuery(path) {
                 alert("Please check all required boxes before booking.");
                 return;
             }
+
+                // ---- SOFT VALIDATION CHECKS ----
+            // These only apply to the NEW customer fields (hidden/disabled for existing customers)
+            if (!state.existingCustomer) {
+                // 1. Full Name must contain a space (first + last name)
+                const fullNameVal = (document.getElementById('input-fullName').value || '').trim();
+                if (fullNameVal.split(' ').filter(Boolean).length < 2) {
+                    alert("Please enter both a first and last name.");
+                    return;
+                }
+
+                // 2. DOB must make the client over 10 years old
+                //    (this also catches the default 'today' date)
+                const dobVal = document.getElementById('input-dob').value;
+                if (dobVal) {
+                    const dobDate = new Date(dobVal);
+                    const today = new Date();
+                    const tenYearsAgo = new Date(
+                        today.getFullYear() - 10,
+                        today.getMonth(),
+                        today.getDate()
+                    );
+                    if (isNaN(dobDate.getTime()) || dobDate >= tenYearsAgo) {
+                        alert("Please enter a valid Date of Birth. The client must be over 10 years old.");
+                        return;
+                    }
+                }
+            }
+
+            // 3. Weight must be 350 lbs or under
+            //    Checks whichever weight field is active (new customer vs. existing "changed" weight)
+            const weightEl = state.existingCustomer
+                ? document.getElementById('input-weight')       // existing customer (only if H/W changed = Yes)
+                : document.getElementById('input-weight-new');  // new customer
+            if (weightEl && weightEl.value !== '') {
+                const weightVal = parseFloat(weightEl.value);
+                if (!isNaN(weightVal) && weightVal > 350) {
+                    alert("Weight must be 350 lbs or under to proceed.");
+                    return;
+                }
+            }
             
             btn.disabled = true;
             const originalText = btn.innerHTML;
