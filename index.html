@@ -3498,13 +3498,25 @@ async function sbQuery(path) {
                     return;
                 }
         
-                container.innerHTML = agenda.map((b) => {
+                const cards = await Promise.all(agenda.map(async (b) => {
                     const timeStr = new Date(b.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                    const details = b.customer.details || {};
-                    
+                    let d = b.customer.details || {};
+                    let name = b.customer.name;
+        
+                    // Fallback: if backend couldn't resolve the customer, look them up by email here.
+                    if (!Object.keys(d).length && b.customer.email) {
+                        try {
+                            const r = await callAppsScript('dbQuery', { path: `customers?email=ilike.${encodeURIComponent(b.customer.email)}&limit=1` });
+                            if (r && r[0]) {
+                                d = r[0];
+                                name = r[0].full_name || name;
+                            }
+                        } catch (e) { /* keep the backend values */ }
+                    }
+        
                     let dobStr = '-';
-                    if (details.dob) {
-                        const dobDate = new Date(details.dob);
+                    if (d.dob) {
+                        const dobDate = new Date(d.dob);
                         if (!isNaN(dobDate.getTime())) {
                             dobStr = `${String(dobDate.getUTCMonth() + 1).padStart(2, '0')}/${String(dobDate.getUTCDate()).padStart(2, '0')}/${dobDate.getUTCFullYear()}`;
                         }
@@ -3518,16 +3530,17 @@ async function sbQuery(path) {
                                        b.customer.guestStatus === 'Declined' ? 'bg-red-50 text-red-600' : 
                                        b.customer.guestStatus === 'Maybe' ? 'bg-orange-50 text-orange-600' : 'bg-gray-50 text-gray-500';
         
-                    // Encode data for edit button - use the calEventId from the agenda
                     const editDataAttr = b.calEventId ? `data-cal-event-id="${b.calEventId}"` : '';
+                    const phone = d.phone || b.customer.phone || '-';
+                    const custNotes = d.notes || '-';
         
                     return `
                     <div class="glass-card rounded-2xl p-6">
                         <div class="flex items-center justify-between mb-2">
                             <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center font-bold text-blue-600">${b.customer.name.split(' ').map(n=>n[0]).join('')}</div>
+                                <div class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center font-bold text-blue-600">${name.split(' ').map(n=>n[0]).join('')}</div>
                                 <div>
-                                    <h3 class="font-bold">${b.customer.name}</h3>
+                                    <h3 class="font-bold">${name}</h3>
                                     <p class="text-gray-500 text-sm">${b.customer.email}</p>
                                 </div>
                             </div>
@@ -3551,12 +3564,12 @@ async function sbQuery(path) {
                         </div>
                         
                         <div class="notes-content hidden grid md:grid-cols-4 gap-4 text-sm mb-2">
-                            <div><span class="text-gray-500">Phone:</span> <span class="font-medium">${b.customer.phone || '-'}</span></div>
-                            <div><span class="text-gray-500">Sex:</span> <span class="font-medium">${details.sex || '-'}</span></div>
+                            <div><span class="text-gray-500">Phone:</span> <span class="font-medium">${phone}</span></div>
+                            <div><span class="text-gray-500">Sex:</span> <span class="font-medium">${d.sex || '-'}</span></div>
                             <div><span class="text-gray-500">DOB:</span> <span class="font-medium">${dobStr}</span></div>
-                            <div><span class="text-gray-500">Height:</span> <span class="font-medium">${details.height || '-'}</span></div>
-                            <div><span class="text-gray-500">Weight:</span> <span class="font-medium">${details.weight || '-'}</span></div>
-                            <div><span class="text-gray-500">Ethnicity:</span> <span class="font-medium">${details.ethnicity || '-'}</span></div>
+                            <div><span class="text-gray-500">Height:</span> <span class="font-medium">${d.height || '-'}</span></div>
+                            <div><span class="text-gray-500">Weight:</span> <span class="font-medium">${d.weight || '-'}</span></div>
+                            <div><span class="text-gray-500">Ethnicity:</span> <span class="font-medium">${d.ethnicity || '-'}</span></div>
                         </div>
                         
                         <div class="border-t border-gray-100 pt-2 mt-2 text-sm">
@@ -3564,12 +3577,15 @@ async function sbQuery(path) {
                                 <div class="flex-1"><span class="text-gray-500 font-semibold">Services:</span> <span class="text-blue-700 font-medium">${b.customer.services}</span></div>
                             </div>
                             <div class="flex gap-6">
-                                <div class="flex-1"><span class="text-gray-500 font-semibold">Cust. Notes:</span> <span class="text-gray-700">${details.notes || '-'}</span></div>
+                                <div class="flex-1"><span class="text-gray-500 font-semibold">Cust. Notes:</span> <span class="text-gray-700">${custNotes}</span></div>
                                 <div class="flex-1"><span class="text-gray-500 font-semibold">Appt. Notes:</span> <span class="text-red-600">${b.customer.apptNote || 'None'}</span></div>
                             </div>
                         </div>
                     </div>
-                `}).join('');
+                    `;
+                }));
+        
+                container.innerHTML = cards.join('');
         
             } catch (e) {
                 console.error(e);
