@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" href="//img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/favicon/808bdf2c-2a53-49a6-a0be-016f10978993/66bfdeea-79f7-45a9-881d-ecbc468da3e2.png/:/rs=w:32,h:32,m" sizes="32x32">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DexaFit KC — Certified Reseller Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://js.stripe.com/v3/"></script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad&render=explicit" async defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-primary: #46A5FC;
+            --brand-primary-dark: #2d8ad9;
+            --brand-gray: #525252;
+            --brand-dark: #000000;
+            --brand-light: #FFFFFF;
+            --brand-blue-100: #D6E9FF;   /* secondary light blue */
+            --brand-gray-100: #D9D9D9;   /* secondary light gray */
+        }
+
+        * { font-family: 'Montserrat', sans-serif; }
+        body { background: #F7FAFF; color: var(--brand-dark); }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.97);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(70, 165, 252, 0.18);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #46A5FC 0%, #2d8ad9 100%);
+            color: white;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(70, 165, 252, 0.3);
+        }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(70, 165, 252, 0.4); }
+        .btn-primary:active:not(:disabled) { transform: translateY(0); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .btn-ghost {
+            background: #fff; color: var(--brand-gray);
+            border: 1.5px solid var(--brand-gray-100); transition: all 0.2s ease;
+        }
+        .btn-ghost:hover { border-color: var(--brand-primary); color: var(--brand-primary); }
+
+        .input-field { border: 2px solid #e5e7eb; transition: all 0.3s ease; }
+        .input-field:focus {
+            border-color: var(--brand-primary);
+            box-shadow: 0 0 0 4px rgba(70, 165, 252, 0.1);
+            outline: none;
+        }
+
+        .spinner {
+            border: 3px solid rgba(255,255,255,0.35); width: 20px; height: 20px;
+            border-radius: 50%; border-left-color: #fff;
+            animation: spin 1s linear infinite; display: inline-block; vertical-align: middle;
+        }
+        .spinner-dark { border: 3px solid rgba(0,0,0,0.1); border-left-color: #46A5FC; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Tier badge tints — the one place we lean into color, to signal status */
+        .tier-chip { display:inline-flex; align-items:center; gap:6px; font-weight:800; letter-spacing:.02em;
+            padding:6px 16px; border-radius:999px; font-size:14px; }
+        .tier-authorized-partner { background:#EEF2F6; color:#525252; }
+        .tier-bronze   { background:#F3E4D3; color:#8A5A2B; }
+        .tier-silver   { background:#ECEFF3; color:#5B6673; }
+        .tier-gold     { background:#FBF0CD; color:#8A6D1F; }
+        .tier-platinum { background:#E7ECF3; color:#465063; }
+        .tier-elite    { background:#D6E9FF; color:#1E5F9E; }
+
+        .progress-track { background: var(--brand-gray-100); border-radius:999px; overflow:hidden; height:10px; }
+        .progress-fill  { background: linear-gradient(90deg,#46A5FC,#2d8ad9); height:100%; border-radius:999px;
+            transition: width .6s cubic-bezier(.4,0,.2,1); }
+
+        .svc-row { border:1.5px solid #EEF2F6; border-radius:16px; transition: border-color .2s ease; }
+        .svc-row:hover { border-color: var(--brand-blue-100); }
+
+        .stepper-btn { width:38px; height:38px; border-radius:10px; border:1.5px solid var(--brand-gray-100);
+            background:#fff; font-size:20px; font-weight:700; color:var(--brand-gray); display:flex;
+            align-items:center; justify-content:center; transition:all .15s ease; user-select:none; }
+        .stepper-btn:hover:not(:disabled) { border-color: var(--brand-primary); color: var(--brand-primary); }
+        .stepper-btn:disabled { opacity:.35; cursor:not-allowed; }
+
+        .toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(120%);
+            background:#111; color:#fff; padding:14px 22px; border-radius:14px; font-size:14px; font-weight:600;
+            box-shadow:0 12px 40px rgba(0,0,0,.25); z-index:100; transition:transform .35s cubic-bezier(.4,0,.2,1);
+            max-width:90vw; text-align:center; }
+        .toast.show { transform:translateX(-50%) translateY(0); }
+        .toast.ok  { background:#0f7b4f; }
+        .toast.err { background:#b42318; }
+
+        .hidden { display:none !important; }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+<script>
+    const CONFIG = {
+        APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyUCDh4GLd3nHyxh7Mil5Q6HUXJASbUC6ihuWIa_4tyW5j0SXYyFa766Fax31AMqZwfWw/exec',
+        STRIPE_PUBLIC_KEY: 'pk_live_51SvR6q0Is9ppr7DjiGonat9GCoOUfHAHqUp1Q99uHW8dJHgj7yBPiLDSwxSdhamXCrwHOVfcqLFWoTHKcdZtduYy00DkssIZLY',
+        TURNSTILE_SITEKEY: '0x4AAAAAACe7Xzo-HnnSOxBi',
+        LOGO: 'https://img1.wsimg.com/isteam/ip/527d0c41-c926-45df-8daf-d6815ea38b0c/blob-e8d8a0e.png/:/cr=t:0%25,l:0%25,w:100%25,h:100%25/rs=w:400,h:100,cg:true'
+    };
+    // Suppress noisy external (turnstile) errors, mirroring the booking page
+    window.onerror = function (message, source, lineno) {
+        if (lineno === 0 || (source && (source.includes('turnstile') || source.includes('challenges.cloudflare')))) return true;
+        console.error('JS Error:', message, 'Line:', lineno); return true;
+    };
+</script>
+
+<!-- ======================= LOGIN VIEW ======================= -->
+<div id="login-view" class="min-h-screen flex items-center justify-center px-6 py-12">
+    <div class="w-full max-w-md">
+        <div class="text-center mb-6">
+            <img id="logo-login" alt="DexaFit KC" class="h-11 inline-block">
+        </div>
+        <div class="text-center mb-8">
+            <div class="tier-chip tier-elite mb-4">Certified Reseller</div>
+            <h1 class="text-3xl font-black text-gray-900 mb-2">Reseller Portal</h1>
+            <p class="text-gray-500 text-sm">DexaFit KC · Olathe, Kansas</p>
+        </div>
+
+        <div id="purchase-banner" class="hidden mb-5 rounded-2xl px-5 py-4 text-sm font-semibold"></div>
+
+        <div class="glass-card rounded-3xl p-8 shadow-xl">
+            <div class="mb-5">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Reseller email</label>
+                <input type="email" id="login-email" class="input-field w-full px-5 py-3.5 rounded-xl"
+                       placeholder="you@yourbusiness.com" autocomplete="username">
+            </div>
+            <div class="mb-5">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+                <input type="password" id="login-password" class="input-field w-full px-5 py-3.5 rounded-xl"
+                       placeholder="Your reseller password" autocomplete="current-password">
+            </div>
+            <p id="login-error" class="text-red-600 text-sm mb-4 hidden"></p>
+
+            <div class="mb-4 flex justify-center">
+                <div id="ts-login"></div>
+            </div>
+
+            <button id="login-btn" onclick="doLogin()" class="btn-primary w-full py-3.5 rounded-xl font-bold text-lg">
+                Log in
+            </button>
+        </div>
+        <p class="text-center text-xs text-gray-400 mt-6 leading-relaxed">
+            Access is limited to approved DexaFit KC (Olathe, KS) certified resellers.<br>
+            Need an account? Contact kc@dexafit.com.
+        </p>
+    </div>
+</div>
+
+<!-- ======================= DASHBOARD VIEW ======================= -->
+<div id="dashboard-view" class="hidden">
+    <!-- Top bar -->
+    <header class="bg-white border-b border-gray-100 sticky top-0 z-40">
+        <div class="max-w-3xl mx-auto px-6 py-3.5 flex items-center justify-between">
+            <img id="logo-dash" alt="DexaFit KC" class="h-8">
+            <div class="flex items-center gap-4">
+                <div class="text-right leading-tight">
+                    <div id="dash-business" class="text-sm font-bold text-gray-900"></div>
+                    <div id="dash-email" class="text-xs text-gray-400"></div>
+                </div>
+                <button onclick="logout()" class="btn-ghost text-sm font-semibold px-4 py-2 rounded-lg">Log out</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto px-6 py-8 space-y-6">
+
+        <!-- Tier / status hero -->
+        <section class="glass-card rounded-3xl p-7 shadow-sm">
+            <div class="flex items-start justify-between mb-5 flex-wrap gap-3">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">Your tier</p>
+                    <span id="tier-badge" class="tier-chip"></span>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Lifetime credits purchased</p>
+                    <p id="lifetime-num" class="text-4xl font-black text-gray-900 leading-none">0</p>
+                </div>
+            </div>
+            <div id="progress-wrap">
+                <div class="flex items-center justify-between text-sm mb-2">
+                    <span id="progress-label" class="font-semibold text-gray-600"></span>
+                    <span id="progress-count" class="text-gray-400 text-xs font-medium"></span>
+                </div>
+                <div class="progress-track"><div id="progress-fill" class="progress-fill" style="width:0%"></div></div>
+            </div>
+            <p id="elite-note" class="hidden text-sm text-[#1E5F9E] font-medium mt-1"></p>
+        </section>
+
+        <!-- Wholesale pricing (current tier) -->
+        <section class="glass-card rounded-3xl p-7 shadow-sm">
+            <h2 class="text-lg font-black text-gray-900 mb-1">Your wholesale pricing</h2>
+            <p class="text-sm text-gray-500 mb-5">Per-credit price at your current tier. Locked in at checkout.</p>
+            <div id="pricing-list" class="space-y-2"></div>
+        </section>
+
+        <!-- Inventory + Assign -->
+        <section class="glass-card rounded-3xl p-7 shadow-sm">
+            <h2 class="text-lg font-black text-gray-900 mb-1">Assign a credit to a client</h2>
+            <p class="text-sm text-gray-500 mb-5">
+                Draw from your inventory and email the credit to your client. They redeem it by booking at
+                DexaFit KC with the email you enter.
+            </p>
+
+            <div id="inventory-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6"></div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Service</label>
+                    <select id="assign-service" class="input-field w-full px-4 py-3 rounded-xl bg-white"></select>
+                </div>
+                <div class="grid sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Client email</label>
+                        <input type="email" id="assign-email" class="input-field w-full px-4 py-3 rounded-xl"
+                               placeholder="client@example.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Client name <span class="text-gray-400 font-normal">(optional)</span></label>
+                        <input type="text" id="assign-name" class="input-field w-full px-4 py-3 rounded-xl"
+                               placeholder="First Last">
+                    </div>
+                </div>
+                <div class="flex justify-center pt-1"><div id="ts-assign"></div></div>
+                <button id="assign-btn" onclick="doAssign()" class="btn-primary w-full py-3.5 rounded-xl font-bold">
+                    Assign &amp; notify client
+                </button>
+            </div>
+        </section>
+
+        <!-- Purchase credits -->
+        <section class="glass-card rounded-3xl p-7 shadow-sm">
+            <h2 class="text-lg font-black text-gray-900 mb-1">Purchase more credits</h2>
+            <p class="text-sm text-gray-500 mb-5">Buy at your current tier's wholesale pricing. Every credit counts toward your next tier.</p>
+
+            <div id="purchase-list" class="space-y-3 mb-5"></div>
+
+            <div class="flex items-center justify-between px-1 mb-5">
+                <span class="text-sm font-semibold text-gray-500">Subtotal <span class="text-gray-400 font-normal">(confirmed at checkout)</span></span>
+                <span id="purchase-total" class="text-2xl font-black text-gray-900">$0.00</span>
+            </div>
+
+            <div class="flex justify-center mb-4"><div id="ts-purchase"></div></div>
+            <button id="purchase-btn" onclick="doPurchase()" class="btn-primary w-full py-3.5 rounded-xl font-bold text-lg" disabled>
+                Purchase credits
+            </button>
+        </section>
+
+        <footer class="text-center text-xs text-gray-400 leading-relaxed pt-2 pb-10">
+            Reseller credits are valid only at DexaFit KC (Olathe, KS), have no cash value, and are non-refundable
+            per your Reseller Agreement. Refunds to your own clients are at your discretion.<br>
+            Support: <a href="mailto:kc@dexafit.com" class="text-gray-500 underline">kc@dexafit.com</a> · 913.444.3141
+        </footer>
+    </main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// ============================================================================
+// STATE
+// ============================================================================
+const state = {
+    email: null,
+    password: null,     // held in memory only, never persisted
+    dashboard: null,
+    purchaseQty: {}     // { dexa: 0, rmr: 0, ... }
+};
+let tsIds = { login: null, assign: null, purchase: null };
+
+const SERVICE_ORDER = ['dexa', 'rmr', 'vo2', 'arterial'];
+const SERVICE_LABELS = {
+    dexa: 'DEXA Body Composition',
+    rmr: 'RMR (Resting Metabolic Rate)',
+    vo2: 'VO2 Max Treadmill',
+    arterial: 'Advanced Arterial Assessment'
+};
+const SERVICE_SHORT = { dexa: 'DEXA', rmr: 'RMR', vo2: 'VO2 Max', arterial: 'Arterial' };
+
+// ============================================================================
+// TURNSTILE (explicit render — one widget per sensitive action)
+// ============================================================================
+window.onTurnstileLoad = function () {
+    tsIds.login = turnstile.render('#ts-login', { sitekey: CONFIG.TURNSTILE_SITEKEY, theme: 'light' });
+};
+function renderDashWidgets() {
+    if (tsIds.assign === null)
+        tsIds.assign = turnstile.render('#ts-assign', { sitekey: CONFIG.TURNSTILE_SITEKEY, theme: 'light' });
+    if (tsIds.purchase === null)
+        tsIds.purchase = turnstile.render('#ts-purchase', { sitekey: CONFIG.TURNSTILE_SITEKEY, theme: 'light' });
+}
+function tsToken(id) { try { return turnstile.getResponse(id) || ''; } catch (e) { return ''; } }
+function tsReset(id) { try { turnstile.reset(id); } catch (e) {} }
+
+// ============================================================================
+// API
+// ============================================================================
+async function callAppsScript(action, data = {}) {
+    const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, ...data })
+    });
+    const text = await response.text();
+    if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) throw new Error('Server error. Please refresh and try again.');
+    const json = JSON.parse(text);
+    if (json.error) throw new Error(json.error);
+    return json;
+}
+
+// Every DB/Stripe action is gated by a fresh Turnstile check first.
+async function verifyTurnstileOrThrow(widgetId) {
+    const token = tsToken(widgetId);
+    if (!token) throw new Error('Please complete the security check.');
+    const res = await callAppsScript('verifyTurnstile', { token });
+    if (!res.success) { tsReset(widgetId); throw new Error('Security check failed. Please try again.'); }
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+function validEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+function money(n) { return '$' + (Number(n) || 0).toFixed(2); }
+function tierClass(name) { return 'tier-' + name.toLowerCase().replace(/\s+/g, '-'); }
+function busy(btn, on, label) {
+    if (on) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> ' + (label || 'Working...'); }
+    else { btn.disabled = false; btn.innerHTML = btn.dataset.label || label; }
+}
+let toastTimer;
+function toast(msg, kind) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = 'toast show' + (kind ? ' ' + kind : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.className = 'toast' + (kind ? ' ' + kind : ''); }, 3800);
+}
+
+// ============================================================================
+// LOGIN
+// ============================================================================
+async function doLogin() {
+    const email = document.getElementById('login-email').value.trim().toLowerCase();
+    const password = document.getElementById('login-password').value;
+    const err = document.getElementById('login-error');
+    const btn = document.getElementById('login-btn');
+    err.classList.add('hidden');
+
+    if (!validEmail(email)) { err.textContent = 'Enter a valid email address.'; err.classList.remove('hidden'); return; }
+    if (!password) { err.textContent = 'Enter your password.'; err.classList.remove('hidden'); return; }
+
+    busy(btn, true, 'Verifying...');
+    try {
+        await verifyTurnstileOrThrow(tsIds.login);
+        const res = await callAppsScript('checkResellerPassword', { email, password });
+        if (!res.valid) {
+            err.textContent = 'Incorrect email or password.'; err.classList.remove('hidden');
+            tsReset(tsIds.login); busy(btn, false, 'Log in'); return;
+        }
+        state.email = email; state.password = password; state.dashboard = res.dashboard;
+        showDashboard();
+    } catch (e) {
+        err.textContent = e.message || 'Something went wrong. Please try again.';
+        err.classList.remove('hidden'); tsReset(tsIds.login); busy(btn, false, 'Log in');
+    }
+}
+
+function logout() {
+    state.email = null; state.password = null; state.dashboard = null; state.purchaseQty = {};
+    document.getElementById('login-password').value = '';
+    document.getElementById('dashboard-view').classList.add('hidden');
+    document.getElementById('login-view').classList.remove('hidden');
+    document.getElementById('login-error').classList.add('hidden');
+    busy(document.getElementById('login-btn'), false, 'Log in');
+    tsReset(tsIds.login);
+    window.scrollTo(0, 0);
+}
+
+// ============================================================================
+// DASHBOARD RENDER
+// ============================================================================
+function showDashboard() {
+    document.getElementById('login-view').classList.add('hidden');
+    document.getElementById('dashboard-view').classList.remove('hidden');
+    renderDashWidgets();
+    renderDashboard();
+    window.scrollTo(0, 0);
+}
+
+async function refreshDashboard() {
+    try {
+        const res = await callAppsScript('getResellerDashboard', { email: state.email, password: state.password });
+        state.dashboard = res.dashboard; renderDashboard();
+    } catch (e) { /* keep prior view */ }
+}
+
+function renderDashboard() {
+    const d = state.dashboard;
+    document.getElementById('dash-business').textContent = d.businessName || 'Reseller';
+    document.getElementById('dash-email').textContent = d.email;
+
+    // Tier + lifetime
+    const badge = document.getElementById('tier-badge');
+    badge.className = 'tier-chip ' + tierClass(d.tier);
+    badge.textContent = d.tier;
+    document.getElementById('lifetime-num').textContent = d.lifetimeSales;
+
+    // Progress
+    const eliteNote = document.getElementById('elite-note');
+    const wrap = document.getElementById('progress-wrap');
+    if (d.nextTier) {
+        wrap.classList.remove('hidden'); eliteNote.classList.add('hidden');
+        const prevAt = tierFloor(d.lifetimeSales);
+        const span = d.nextTier.at - prevAt;
+        const done = d.lifetimeSales - prevAt;
+        const pct = Math.max(0, Math.min(100, span > 0 ? (done / span) * 100 : 0));
+        document.getElementById('progress-fill').style.width = pct + '%';
+        document.getElementById('progress-label').textContent =
+            d.nextTier.remaining + ' more credit' + (d.nextTier.remaining === 1 ? '' : 's') + ' to ' + d.nextTier.name;
+        document.getElementById('progress-count').textContent = d.lifetimeSales + ' / ' + d.nextTier.at;
+    } else {
+        wrap.classList.add('hidden'); eliteNote.classList.remove('hidden');
+        eliteNote.textContent = "You've reached Elite — our top tier, with additional benefits that unlock over time.";
+    }
+
+    // Pricing
+    const pl = document.getElementById('pricing-list');
+    pl.innerHTML = SERVICE_ORDER.map(k =>
+        `<div class="flex items-center justify-between svc-row px-4 py-3">
+            <span class="font-semibold text-gray-700 text-sm">${SERVICE_LABELS[k]}</span>
+            <span class="font-black text-gray-900">${money(d.pricing[k])}</span>
+        </div>`).join('');
+
+    // Inventory chips
+    const ig = document.getElementById('inventory-grid');
+    ig.innerHTML = SERVICE_ORDER.map(k =>
+        `<div class="svc-row px-3 py-3 text-center">
+            <div class="text-2xl font-black text-gray-900">${d.inventory[k]}</div>
+            <div class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mt-0.5">${SERVICE_SHORT[k]}</div>
+        </div>`).join('');
+
+    // Assign dropdown — only services with inventory
+    const sel = document.getElementById('assign-service');
+    const available = SERVICE_ORDER.filter(k => d.inventory[k] > 0);
+    const assignBtn = document.getElementById('assign-btn');
+    if (available.length === 0) {
+        sel.innerHTML = `<option value="">No credits available — purchase below</option>`;
+        sel.disabled = true; assignBtn.disabled = true;
+    } else {
+        sel.disabled = false; assignBtn.disabled = false;
+        sel.innerHTML = available.map(k =>
+            `<option value="${k}">${SERVICE_LABELS[k]} — ${d.inventory[k]} available</option>`).join('');
+    }
+
+    // Purchase steppers
+    renderPurchaseList();
+}
+
+// Lowest tier threshold at/below the current lifetime count (for progress math)
+function tierFloor(lifetime) {
+    const floors = [0, 10, 25, 50, 100, 125];
+    let f = 0; for (const x of floors) if (lifetime >= x) f = x; return f;
+}
+
+// ============================================================================
+// PURCHASE
+// ============================================================================
+function renderPurchaseList() {
+    const d = state.dashboard;
+    SERVICE_ORDER.forEach(k => { if (!(k in state.purchaseQty)) state.purchaseQty[k] = 0; });
+    const list = document.getElementById('purchase-list');
+    list.innerHTML = SERVICE_ORDER.map(k =>
+        `<div class="svc-row flex items-center justify-between px-4 py-3">
+            <div>
+                <div class="font-semibold text-gray-800 text-sm">${SERVICE_LABELS[k]}</div>
+                <div class="text-xs text-gray-400 mt-0.5">${money(d.pricing[k])} each</div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button class="stepper-btn" onclick="stepQty('${k}',-1)" aria-label="decrease">&minus;</button>
+                <span id="qty-${k}" class="w-8 text-center font-bold text-gray-900">${state.purchaseQty[k]}</span>
+                <button class="stepper-btn" onclick="stepQty('${k}',1)" aria-label="increase">&plus;</button>
+            </div>
+        </div>`).join('');
+    updatePurchaseTotal();
+}
+
+function stepQty(k, delta) {
+    state.purchaseQty[k] = Math.max(0, (state.purchaseQty[k] || 0) + delta);
+    document.getElementById('qty-' + k).textContent = state.purchaseQty[k];
+    updatePurchaseTotal();
+}
+
+function updatePurchaseTotal() {
+    const d = state.dashboard;
+    let total = 0, count = 0;
+    SERVICE_ORDER.forEach(k => { total += (state.purchaseQty[k] || 0) * d.pricing[k]; count += state.purchaseQty[k] || 0; });
+    document.getElementById('purchase-total').textContent = money(total);
+    document.getElementById('purchase-btn').disabled = count === 0;
+}
+
+async function doPurchase() {
+    const btn = document.getElementById('purchase-btn');
+    const items = SERVICE_ORDER
+        .filter(k => (state.purchaseQty[k] || 0) > 0)
+        .map(k => ({ service: k, qty: state.purchaseQty[k] }));
+    if (items.length === 0) return;
+
+    busy(btn, true, 'Redirecting to checkout...');
+    try {
+        await verifyTurnstileOrThrow(tsIds.purchase);
+        const res = await callAppsScript('createResellerCreditSession', {
+            email: state.email, password: state.password, items
+        });
+        if (!res.sessionId) throw new Error('Could not start checkout. Please try again.');
+        const stripe = Stripe(CONFIG.STRIPE_PUBLIC_KEY);
+        await stripe.redirectToCheckout({ sessionId: res.sessionId });
+    } catch (e) {
+        toast(e.message || 'Checkout failed.', 'err');
+        tsReset(tsIds.purchase); busy(btn, false, 'Purchase credits');
+    }
+}
+
+// ============================================================================
+// ASSIGN
+// ============================================================================
+async function doAssign() {
+    const service = document.getElementById('assign-service').value;
+    const clientEmail = document.getElementById('assign-email').value.trim();
+    const clientName = document.getElementById('assign-name').value.trim();
+    const btn = document.getElementById('assign-btn');
+
+    if (!service) { toast('You have no credits to assign yet.', 'err'); return; }
+    if (!validEmail(clientEmail)) { toast('Enter a valid client email.', 'err'); return; }
+
+    busy(btn, true, 'Assigning...');
+    try {
+        await verifyTurnstileOrThrow(tsIds.assign);
+        const res = await callAppsScript('assignResellerCredit', {
+            email: state.email, password: state.password, service, clientEmail, clientName
+        });
+        if (!res.success) throw new Error('Assignment failed. Please try again.');
+        toast('Credit assigned. ' + clientEmail + ' has been emailed.', 'ok');
+        document.getElementById('assign-email').value = '';
+        document.getElementById('assign-name').value = '';
+        tsReset(tsIds.assign);
+        await refreshDashboard();
+        busy(btn, false, 'Assign &amp; notify client');
+    } catch (e) {
+        toast(e.message || 'Assignment failed.', 'err');
+        tsReset(tsIds.assign); busy(btn, false, 'Assign &amp; notify client');
+    }
+}
+
+// ============================================================================
+// INIT
+// ============================================================================
+(function init() {
+    document.getElementById('logo-login').src = CONFIG.LOGO;
+    document.getElementById('logo-dash').src = CONFIG.LOGO;
+
+    // Post-Stripe return banner
+    const params = new URLSearchParams(window.location.search);
+    const banner = document.getElementById('purchase-banner');
+    if (params.get('purchase') === 'success') {
+        banner.className = 'mb-5 rounded-2xl px-5 py-4 text-sm font-semibold';
+        banner.style.background = '#D6E9FF'; banner.style.color = '#1E5F9E';
+        banner.textContent = 'Payment received. Your credits appear within a minute — log in to view your updated balance.';
+        banner.classList.remove('hidden');
+    } else if (params.get('purchase') === 'cancel') {
+        banner.className = 'mb-5 rounded-2xl px-5 py-4 text-sm font-semibold';
+        banner.style.background = '#FEF3F2'; banner.style.color = '#B42318';
+        banner.textContent = 'Checkout canceled — no charge was made.';
+        banner.classList.remove('hidden');
+    }
+    if (params.get('purchase')) history.replaceState({}, '', window.location.pathname);
+
+    // Enter-to-submit on login
+    ['login-email', 'login-password'].forEach(id =>
+        document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); }));
+})();
+</script>
+</body>
+</html>
