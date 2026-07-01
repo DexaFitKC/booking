@@ -3504,15 +3504,15 @@ async function sbQuery(path) {
                     let name = b.customer.name;
         
                     // Fallback: if backend couldn't resolve the customer, look them up by email here.
-                    if (!Object.keys(d).length && b.customer.email) {
-                        try {
-                            const r = await callAppsScript('dbQuery', { path: `customers?email=ilike.${encodeURIComponent(b.customer.email)}&limit=1` });
-                            if (r && r[0]) {
-                                d = r[0];
-                                name = r[0].full_name || name;
-                            }
-                        } catch (e) { /* keep the backend values */ }
-                    }
+                    if (!Object.keys(d).length && b.customer.customerId != null) {
+                            try {
+                                const r = await callAppsScript('dbQuery', { path: `customers?id=eq.${b.customer.customerId}&limit=1` });
+                                if (r && r[0]) {
+                                    d = r[0];
+                                    name = r[0].full_name || name;
+                                }
+                            } catch (e) { /* keep the backend values */ }
+                        }
         
                     let dobStr = '-';
                     if (d.dob) {
