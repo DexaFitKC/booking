@@ -335,6 +335,7 @@ function busy(btn, on, label) {
     if (on) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> ' + (label || 'Working...'); }
     else { btn.disabled = false; btn.innerHTML = btn.dataset.label || label; }
 }
+    
 let toastTimer;
 function toast(msg, kind) {
     const t = document.getElementById('toast');
