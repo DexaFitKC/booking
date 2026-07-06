@@ -18,19 +18,21 @@
       }
     };
 
-    const DB_API_URL    = 'https://tmitlt.com/api/db.php';
-    const DB_API_SECRET = 'dbread15544';
-    
-    async function sbQuery(path) {
-        const res = await fetch(`${DB_API_URL}/${path}`, {
-            headers: {
-                'X-Api-Key': DB_API_SECRET,
-                'Accept': 'application/json'
-            }
+    // Data access goes through the Apps Script backend (getDashboardData),
+    // which verifies the dashboard password server-side. The database API
+    // key is no longer present in this file — never put it back here: it
+    // was readable by anyone who viewed the page source.
+    async function callAppsScript(action, data = {}) {
+        const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action, ...data })
         });
-        if (!res.ok) throw new Error(`DB error: ${res.status}`);
         const text = await res.text();
-        return text ? JSON.parse(text) : [];
+        if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) throw new Error('Server error. Please refresh and try again.');
+        const json = JSON.parse(text);
+        if (json.error) throw new Error(json.error);
+        return json;
     }
     
     window.onerror = function(message, source, lineno, colno, error) {
@@ -1082,13 +1084,16 @@ function loadData(type) {
   const loadingEl = document.getElementById(type === 'marketing' ? 'mktg-loading' : 'ops-loading');
   loadingEl.classList.remove('hidden');
 
-  // Fetch from Supabase directly (much faster than Apps Script → Sheets)
-  Promise.all([
-    sbQuery('appointment_log?select=customer_email,service_name,est_cost,appt_date,status,booked_timestamp,discount_used,referrer,utm_content&order=id.asc'),
-    sbQuery('customers?select=email,sex,dob&order=id.asc'),
-    sbQuery('time_clock?select=employee,clock_in,clock_out,hours&order=clock_in.asc')
-])
-.then(function([apptRows, custRows, clockRows]) {
+  // One password-gated backend call fetches all three datasets in parallel
+  // server-side (the password was already verified at unlock).
+  callAppsScript('getDashboardData', {
+    password: STATE.password,
+    dashboardType: STATE.dashboardType
+  })
+.then(function(result) {
+    const apptRows  = result.appointments || [];
+    const custRows  = result.customers    || [];
+    const clockRows = result.timeclock    || [];
     loadingEl.classList.add('hidden');
 
     // Map to expected format
