@@ -355,7 +355,8 @@
             currentStep: 1,
             customerEmail: '',
             existingCustomer: null,
-            questions: []
+            questions: [],
+            bookingToken: null   // server-issued after Turnstile-verified email check
         };
 
         // ============================================
@@ -384,20 +385,13 @@
             }
         }
 
-        async function sbQuery(path) {
-            return await callAppsScript('dbQuery', { path });
-        }
-
-        async function sb_checkCustomer(email) {
-            const rows = await sbQuery(`customers?email=ilike.${encodeURIComponent(email)}&limit=1`);
-            if (rows.length === 0) return { exists: false };
-            const c = rows[0];
-            const customer = {
-                id: c.id, email: c.email, fullName: c.full_name,
-                phone: c.phone, sex: c.sex, dob: c.dob,
-                height: c.height, weight: c.weight, ethnicity: c.ethnicity, notes: c.notes
-            };
-            return { exists: true, customer };
+        async function sb_checkCustomer(email, turnstileToken) {
+            const payload = { email };
+            if (turnstileToken) payload.turnstileToken = turnstileToken;
+            if (state.bookingToken) payload.bookingToken = state.bookingToken;
+            const res = await callAppsScript('checkCustomer', payload);
+            if (res.bookingToken) state.bookingToken = res.bookingToken;
+            return res;
         }
 
         // ============================================
@@ -453,8 +447,8 @@
             if (state.currentStep > 1) {
                 state.currentStep--;
                 // Going back to step 1 — the prior Turnstile token has already
-                // been consumed by verifyTurnstile, so reset the widget so the
-                // user can re-verify if they try to continue again.
+                // been consumed by the verified checkCustomer call, so reset
+                // the widget so the user can re-verify if they continue again.
                 if (state.currentStep === 1 && window.turnstile) {
                     try { turnstile.reset(); } catch (e) { /* no-op */ }
                 }
@@ -494,28 +488,12 @@
             btn.innerHTML = '<div class="spinner"></div> Verifying...';
             btn.disabled = true;
 
-            // 3. Verify Turnstile with backend
-            try {
-                const verification = await callAppsScript('verifyTurnstile', { token });
-                if (!verification.success) {
-                    alert("Security verification failed. Please try again.");
-                    if (window.turnstile) turnstile.reset();
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                    return;
-                }
-            } catch (e) {
-                alert("Error verifying security. Try again later.");
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-                return;
-            }
-
-            // 4. Look up customer
+            // 3+4. Verify Turnstile and look up the customer in ONE server
+            // call — the backend rejects the lookup if the token is invalid
+            // and returns a session booking token for the final submit.
             state.customerEmail = email;
-            btn.innerHTML = '<div class="spinner"></div> Loading...';
             try {
-                const response = await sb_checkCustomer(email);
+                const response = await sb_checkCustomer(email, token);
                 if (response.exists) {
                     state.existingCustomer = response.customer;
                     document.getElementById('welcome-name').textContent = response.customer.fullName;
@@ -526,7 +504,14 @@
                 }
             } catch (error) {
                 console.error("Backend Connection Failed:", error);
-                // Continue regardless — treating as new customer is safer than blocking
+                if (error && /Security check|Session expired/i.test(error.message || '')) {
+                    alert("Security verification failed. Please try again.");
+                    if (window.turnstile) turnstile.reset();
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    return;
+                }
+                // Other backend errors: continue — treating as new customer is safer than blocking
                 state.existingCustomer = null;
             }
 
@@ -726,7 +711,8 @@
                 questionResponses,
                 referrer,
                 utmcont,
-                fbclid
+                fbclid,
+                bookingToken: state.bookingToken
             };
 
             callAppsScript('createBooking', bookingData)
