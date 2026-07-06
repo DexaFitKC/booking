@@ -317,12 +317,13 @@ async function callAppsScript(action, data = {}) {
     return json;
 }
 
-// Every DB/Stripe action is gated by a fresh Turnstile check first.
-async function verifyTurnstileOrThrow(widgetId) {
+// Every sensitive action carries its Turnstile token in the SAME request;
+// the backend verifies it before executing (an out-of-band verify call could
+// be skipped by a bot hitting the action directly).
+function requireToken(widgetId) {
     const token = tsToken(widgetId);
     if (!token) throw new Error('Please complete the security check.');
-    const res = await callAppsScript('verifyTurnstile', { token });
-    if (!res.success) { tsReset(widgetId); throw new Error('Security check failed. Please try again.'); }
+    return token;
 }
 
 // ============================================================================
@@ -359,8 +360,8 @@ async function doLogin() {
 
     busy(btn, true, 'Verifying...');
     try {
-        await verifyTurnstileOrThrow(tsIds.login);
-        const res = await callAppsScript('checkResellerPassword', { email, password });
+        const turnstileToken = requireToken(tsIds.login);
+        const res = await callAppsScript('checkResellerPassword', { email, password, turnstileToken });
         if (!res.valid) {
             err.textContent = 'Incorrect email or password.'; err.classList.remove('hidden');
             tsReset(tsIds.login); busy(btn, false, 'Log in'); return;
@@ -515,9 +516,9 @@ async function doPurchase() {
 
     busy(btn, true, 'Redirecting to checkout...');
     try {
-        await verifyTurnstileOrThrow(tsIds.purchase);
+        const turnstileToken = requireToken(tsIds.purchase);
         const res = await callAppsScript('createResellerCreditSession', {
-            email: state.email, password: state.password, items
+            email: state.email, password: state.password, items, turnstileToken
         });
         if (!res.sessionId) throw new Error('Could not start checkout. Please try again.');
         const stripe = Stripe(CONFIG.STRIPE_PUBLIC_KEY);
@@ -542,9 +543,9 @@ async function doAssign() {
 
     busy(btn, true, 'Assigning...');
     try {
-        await verifyTurnstileOrThrow(tsIds.assign);
+        const turnstileToken = requireToken(tsIds.assign);
         const res = await callAppsScript('assignResellerCredit', {
-            email: state.email, password: state.password, service, clientEmail, clientName
+            email: state.email, password: state.password, service, clientEmail, clientName, turnstileToken
         });
         if (!res.success) throw new Error('Assignment failed. Please try again.');
         toast('Credit assigned. ' + clientEmail + ' has been emailed.', 'ok');
@@ -566,15 +567,12 @@ async function doAssign() {
     document.getElementById('logo-login').src = CONFIG.LOGO;
     document.getElementById('logo-dash').src = CONFIG.LOGO;
 
-    // Post-Stripe return banner
+    // Post-Stripe return banner. Successful checkouts now land on
+    // https://dexafitkc.com/success (set server-side); only the cancel
+    // path returns here with ?purchase=cancel.
     const params = new URLSearchParams(window.location.search);
     const banner = document.getElementById('purchase-banner');
-    if (params.get('purchase') === 'success') {
-        banner.className = 'mb-5 rounded-2xl px-5 py-4 text-sm font-semibold';
-        banner.style.background = '#D6E9FF'; banner.style.color = '#1E5F9E';
-        banner.textContent = 'Payment received. Your credits appear within a minute — log in to view your updated balance.';
-        banner.classList.remove('hidden');
-    } else if (params.get('purchase') === 'cancel') {
+    if (params.get('purchase') === 'cancel') {
         banner.className = 'mb-5 rounded-2xl px-5 py-4 text-sm font-semibold';
         banner.style.background = '#FEF3F2'; banner.style.color = '#B42318';
         banner.textContent = 'Checkout canceled — no charge was made.';
