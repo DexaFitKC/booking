@@ -440,6 +440,8 @@
         const state = {
             currentStep: 1,
             partnerName: null,            // set after partner login
+            bookingToken: null,           // server-issued after Turnstile-verified login
+            partnerToken: null,           // proves partnerName to createBooking
             customerEmail: '',
             existingCustomer: null,
             selectedDate: null,
@@ -474,20 +476,9 @@
             }
         }
 
-        async function sbQuery(path) {
-            return await callAppsScript('dbQuery', { path });
-        }
-
         async function sb_checkCustomer(email) {
-            const rows = await sbQuery(`customers?email=ilike.${encodeURIComponent(email)}&limit=1`);
-            if (rows.length === 0) return { exists: false };
-            const c = rows[0];
-            const customer = {
-                id: c.id, email: c.email, fullName: c.full_name,
-                phone: c.phone, sex: c.sex, dob: c.dob,
-                height: c.height, weight: c.weight, ethnicity: c.ethnicity, notes: c.notes
-            };
-            return { exists: true, customer };
+            // Authenticated by the session booking token issued at partner login.
+            return await callAppsScript('checkCustomer', { email, bookingToken: state.bookingToken });
         }
 
         // ============================================
@@ -599,30 +590,14 @@
             btn.innerHTML = '<div class="spinner"></div> Verifying...';
             btn.disabled = true;
 
-            // Verify Turnstile first
+            // Check partner password — Turnstile token is verified server-side
+            // as part of the same call (closes the verify-then-skip gap).
             try {
-                const verification = await callAppsScript('verifyTurnstile', { token });
-                if (!verification.success) {
-                    errEl.textContent = "Security verification failed. Please try again.";
-                    errEl.classList.remove('hidden');
-                    if (window.turnstile) turnstile.reset();
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                    return;
-                }
-            } catch (e) {
-                errEl.textContent = "Error verifying security. Try again.";
-                errEl.classList.remove('hidden');
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-                return;
-            }
-
-            // Check partner password
-            try {
-                const response = await callAppsScript('checkPartnerPassword', { password });
+                const response = await callAppsScript('checkPartnerPassword', { password, turnstileToken: token });
                 if (response.valid && response.partnerName) {
                     state.partnerName = response.partnerName;
+                    state.bookingToken = response.bookingToken || null;
+                    state.partnerToken = response.partnerToken || null;
                     document.getElementById('partner-name').textContent = response.partnerName;
                     document.getElementById('partner-name-display').classList.remove('hidden');
 
@@ -642,7 +617,7 @@
                 }
             } catch (err) {
                 console.error(err);
-                errEl.textContent = "Error checking password. Try again.";
+                errEl.textContent = (err && err.message) ? err.message : "Error checking password. Try again.";
                 errEl.classList.remove('hidden');
                 if (window.turnstile) turnstile.reset();
                 btn.innerHTML = originalText;
@@ -1011,6 +986,8 @@
                 questionResponses,
                 referrer: state.partnerName,        // e.g., "Tom's Clinic"
                 partnerName: state.partnerName,     // explicit flag for backend
+                partnerToken: state.partnerToken,   // server-side proof of partner login
+                bookingToken: state.bookingToken,
                 utmcont: '',
                 fbclid: ''
             };
