@@ -2055,9 +2055,9 @@ function escapeHtml(value) {
                     state.existingCustomer = response.customer;
                     document.getElementById('welcome-name').textContent = response.customer.fullName;
                     document.getElementById('customer-name-display').classList.remove('hidden');
-                    state.credits = response.credits || [];
-                    state.giftCards = response.giftCards || [];
                 }
+                state.credits = response.credits || [];
+                state.giftCards = response.giftCards || [];
             } catch (error) {
                 console.error("Backend Connection Failed:", error);
                 if (error && /Security check/i.test(error.message || '')) {
@@ -3404,9 +3404,9 @@ function escapeHtml(value) {
                     state.existingCustomer = response.customer;
                     document.getElementById('welcome-name').textContent = response.customer.fullName;
                     document.getElementById('customer-name-display').classList.remove('hidden');
-                    state.credits = response.credits || [];
-                    state.giftCards = response.giftCards || [];
                 }
+                state.credits = response.credits || [];
+                state.giftCards = response.giftCards || [];
             } catch (error) {
                 console.error("Backend Connection Failed:", error);
             }
