@@ -173,9 +173,6 @@
             </div>
 
             <div class="glass-card rounded-3xl p-6 sm:p-8 shadow-xl">
-                <div class="flex justify-center mb-5">
-                    <div class="cf-turnstile" data-sitekey="0x4AAAAAACe7Xzo-HnnSOxBi" data-theme="light" data-size="flexible"></div>
-                </div>
                 <button id="welcome-continue" onclick="continueFromWelcome()" class="btn-primary w-full py-4 rounded-xl font-bold text-lg">
                     Continue
                 </button>
@@ -250,6 +247,12 @@
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
                 <input type="email" id="email-input" class="input-field w-full px-5 py-4 rounded-xl text-lg" placeholder="your@email.com">
                 <p id="email-error" class="text-red-500 text-sm mt-2 hidden">Please enter a valid email address.</p>
+                <!-- Turnstile lives HERE (not on welcome): the token is single-use and
+                     expires in ~5 min, so it must be minted right before the call that
+                     spends it — checkEmail() -> checkCustomer. -->
+                <div id="turnstile-wrap" class="flex justify-center mt-6">
+                    <div class="cf-turnstile" data-sitekey="0x4AAAAAACe7Xzo-HnnSOxBi" data-theme="light" data-size="flexible"></div>
+                </div>
                 <button id="email-continue" onclick="checkEmail()" class="btn-primary w-full py-4 rounded-xl font-bold text-lg mt-6">Continue</button>
             </div>
         </div>
@@ -371,6 +374,7 @@
             selectedTime: null,
             totalDuration: 0,
             price: null,             // bundle price from ?price=
+            bookingToken: null,      // session token issued by checkCustomer; required by createBooking
             promoEnd: null,          // Date object — last selectable day, from ?promoEnd=
             currentMonthStart: null, // First day of the month currently shown in the calendar
             headline: '',
@@ -399,17 +403,19 @@
             return jsonData;
         }
 
-        async function sbQuery(path) { return await callAppsScript('dbQuery', { path }); }
+        // NOTE: 'dbQuery' is no longer a public action server-side — it requires the
+        // admin password. Customer lookup goes through 'checkCustomer', which verifies
+        // the Turnstile token AND hands back the session bookingToken that createBooking
+        // now demands. Same call the main booking page uses.
+        async function checkCustomerExists(email, turnstileToken) {
+            const payload = { email };
+            if (turnstileToken) payload.turnstileToken = turnstileToken;
+            if (state.bookingToken) payload.bookingToken = state.bookingToken;
 
-        async function checkCustomerExists(email) {
-            const rows = await sbQuery(`customers?email=ilike.${encodeURIComponent(email)}&limit=1`);
-            if (rows.length === 0) return { exists: false };
-            const c = rows[0];
-            return { exists: true, customer: {
-                id: c.id, email: c.email, fullName: c.full_name,
-                phone: c.phone, sex: c.sex, dob: c.dob,
-                height: c.height, weight: c.weight, ethnicity: c.ethnicity, notes: c.notes
-            }};
+            const res = await callAppsScript('checkCustomer', payload);
+            // Only issued on the first (Turnstile-verified) lookup — don't clobber it.
+            if (res.bookingToken) state.bookingToken = res.bookingToken;
+            return res;
         }
 
         // ============================================
@@ -542,16 +548,14 @@
 
         function goBack() {
             if (state._step === 'schedule') {
-                // Going back to welcome — clear the schedule selection AND reset
-                // Turnstile so re-entry to the calendar is a fresh start with a
-                // fresh security token.
+                // Going back to welcome — clear the schedule selection. The Turnstile
+                // widget is on the email step now and manages its own lifecycle, so
+                // there's nothing to reset here (and resetting would throw away a
+                // perfectly good token).
                 state.selectedDate = null;
                 state.selectedTime = null;
                 document.getElementById('schedule-continue').disabled = true;
                 document.getElementById('time-slots-container').classList.add('hidden');
-                if (window.turnstile) {
-                    try { turnstile.reset(); } catch (e) { /* no-op */ }
-                }
                 showStep('welcome');
             } else if (state._step === 'email') {
                 showStep('schedule');
@@ -563,34 +567,12 @@
         // ============================================
         // STEP 1 -> 2: WELCOME (Turnstile gate)
         // ============================================
-        async function continueFromWelcome() {
+        // The security check now happens at the email step, where its token is
+        // actually spent. getAvailability is a public action and needs no token,
+        // so the calendar can render freely here.
+        function continueFromWelcome() {
             const btn = document.getElementById('welcome-continue');
             if (btn.disabled) return;
-
-            const tokenEl = document.querySelector('[name="cf-turnstile-response"]');
-            const token = tokenEl ? tokenEl.value : '';
-            if (!token) { alert('Please complete the security check.'); return; }
-
-            const original = btn.innerHTML;
-            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:3px;"></div> Verifying…';
-            btn.disabled = true;
-
-            try {
-                const v = await callAppsScript('verifyTurnstile', { token });
-                if (!v.success) {
-                    alert('Security verification failed. Please try again.');
-                    if (window.turnstile) turnstile.reset();
-                    btn.innerHTML = original; btn.disabled = false;
-                    return;
-                }
-            } catch (e) {
-                console.error(e);
-                alert('Network error. Please try again.');
-                btn.innerHTML = original; btn.disabled = false;
-                return;
-            }
-
-            btn.innerHTML = original; btn.disabled = false;
             showStep('schedule');
             renderCalendar();
         }
@@ -730,19 +712,38 @@
             }
             document.getElementById('email-error').classList.add('hidden');
 
+            // Grab a fresh Turnstile token. Only needed for the FIRST lookup — once we
+            // hold a bookingToken, the server accepts that instead.
+            let token = '';
+            const tokenEl = document.querySelector('#turnstile-wrap [name="cf-turnstile-response"]');
+            if (tokenEl) token = tokenEl.value || '';
+            if (!token && !state.bookingToken) {
+                alert('Please complete the security check.');
+                return;
+            }
+
             // Clear prior customer state so a back-then-change-email flow re-looks-up cleanly
             state.existingCustomer = null;
             state.customerEmail = email;
 
             const original = btn.innerHTML;
-            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:3px;"></div> Loading…';
+            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:3px;"></div> Verifying…';
             btn.disabled = true;
 
             try {
-                const response = await checkCustomerExists(email);
+                const response = await checkCustomerExists(email, token);
                 state.existingCustomer = response.exists ? response.customer : null;
             } catch (e) {
                 console.error('Customer lookup failed:', e);
+                // A security failure must NOT fall through — without a bookingToken the
+                // booking will be rejected at the final step anyway. Stop here instead.
+                if (/security check|unauthorized/i.test(e.message || '')) {
+                    alert('Security verification failed. Please try again.');
+                    if (window.turnstile) { try { turnstile.reset(); } catch (_) {} }
+                    btn.innerHTML = original; btn.disabled = false;
+                    return;
+                }
+                // Other backend errors: proceed, treating them as a new customer.
                 state.existingCustomer = null;
             }
 
@@ -915,7 +916,10 @@
                 questionResponses,
                 referrer: params.get('ref') || 'ad-landing',
                 utmcont: params.get('utm_content') || '',
-                fbclid: params.get('fbclid') || ''
+                fbclid: params.get('fbclid') || '',
+                // Required — createBooking rejects the request without a valid
+                // session token ("Session expired...").
+                bookingToken: state.bookingToken
             };
 
             callAppsScript('createBooking', bookingData)
