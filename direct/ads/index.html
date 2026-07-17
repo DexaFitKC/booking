@@ -427,6 +427,10 @@
             return Number.isInteger(p) ? `$${p}` : `$${p.toFixed(2)}`;
         }
 
+        function toLocalDateStr(d) {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
         function renderServiceSummaryEverywhere() {
             const services = state.selectedServices.map(s => s.shortName).join(' + ');
             const priceStr = formatPrice(state.price);
@@ -646,7 +650,7 @@
 
             try {
                 const response = await callAppsScript('getAvailability', {
-                    date: state.selectedDate.toISOString(),
+                    date: toLocalDateStr(state.selectedDate),
                     duration: state.totalDuration
                 });
                 renderTimeSlots(response.slots || []);
@@ -909,7 +913,7 @@
                 // Per-service prices left at 0 — the backend uses bookingData.price
                 // as the single source of truth for revenue/calendar/email display
                 services: state.selectedServices.map(s => ({ id: s.id, name: s.name, price: 0, duration: s.duration })),
-                date: state.selectedDate.toISOString(),
+                date: toLocalDateStr(state.selectedDate),
                 time: state.selectedTime,
                 duration: state.totalDuration,
                 price: state.price,
