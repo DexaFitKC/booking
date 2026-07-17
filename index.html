@@ -2363,6 +2363,11 @@ function escapeHtml(value) {
                 alert("Error fetching credits: " + e.message);
             }
         }
+
+        // A calendar date is not an instant. Send Y-M-D
+        function toLocalDateStr(d) {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }    
         
         function updateOrderSummary() {
             let totalDuration = 0;
@@ -2555,18 +2560,18 @@ function escapeHtml(value) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            // Weekday header row (Monday-first to match the business week)
-            const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-            dayNames.forEach(dn => {
-                dateSelector.innerHTML += `<div class="text-center text-xs font-semibold text-gray-400 pb-1">${dn}</div>`;
-            });
-
-            // Blank leading cells so the 1st lands under the correct weekday
-            const firstOfMonth = new Date(year, month, 1);
-            const offset = (firstOfMonth.getDay() + 6) % 7; // Mon = 0 ... Sun = 6
-            for (let i = 0; i < offset; i++) {
-                dateSelector.innerHTML += `<div></div>`;
-            }
+            // Weekday header row (Sunday-first, standard US calendar)
+                const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                dayNames.forEach(dn => {
+                    dateSelector.innerHTML += `<div class="text-center text-xs font-semibold text-gray-400 pb-1">${dn}</div>`;
+                });
+                
+                // Blank leading cells so the 1st lands under the correct weekday
+                const firstOfMonth = new Date(year, month, 1);
+                const offset = firstOfMonth.getDay(); // Sun = 0 ... Sat = 6
+                for (let i = 0; i < offset; i++) {
+                    dateSelector.innerHTML += `<div></div>`;
+                }
 
             // One button per day of the month
             const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -2609,7 +2614,7 @@ function escapeHtml(value) {
 
             try {
                 const response = await callAppsScript('getAvailability', {
-                    date: state.selectedDate.toISOString(),
+                    date: toLocalDateStr(state.selectedDate),
                     duration: state.totalDuration
                 });
                 renderTimeSlots(response.slots);
@@ -2918,7 +2923,7 @@ function escapeHtml(value) {
                 customerData,
                 isNewCustomer: !state.existingCustomer,
                 services: state.selectedServices.map(id => state.services.find(s => s.id === id)),
-                date: state.selectedDate.toISOString(),
+                date: toLocalDateStr(state.selectedDate),
                 time: state.selectedTime,
                 duration: state.totalDuration,
                 price: state.totalPrice,
