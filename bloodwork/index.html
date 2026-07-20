@@ -1607,6 +1607,18 @@ const INDIVIDUAL_MARKERS = [
     { code:'7915', name:'Zonisamide(Zonegran), Serum', price:104, desc:'Zonisamide(Zonegran), Serum — a test used for therapeutic drug or medication monitoring.', kw:'drug medication monitoring toxicology' }
 ];
 
+// Commonly ordered markers surfaced at the top of the Individual tab.
+const POPULAR_MARKERS = [
+    'Comp. Metabolic Panel (14)', 'CBC With Differential/Platelet', 'Lipid Panel', 'Hemoglobin A1c',
+    'TSH', 'Vitamin D, 25-Hydroxy', 'Testosterone,Free and Total', 'Testosterone', 'Estradiol',
+    'Ferritin', 'Vitamin B12', 'Iron and TIBC', 'Thyroxine (T4) Free, Direct',
+    'Triiodothyronine (T3), Free', 'Thyroid Peroxidase (TPO) Ab', 'Cortisol', 'Insulin',
+    'DHEA-Sulfate', 'C-Reactive Protein, Cardiac', 'Homocysteine', 'Apolipoprotein B',
+    'Prostate-Specific Ag', 'Progesterone', 'Magnesium'
+];
+const IND_BY_NAME = {};
+INDIVIDUAL_MARKERS.forEach(m => { if (!(m.name in IND_BY_NAME)) IND_BY_NAME[m.name] = m; });
+
 const PANELS = [
     { name: 'Marek Health Comprehensive Panel', partner: 'Marek Health', extra: '45min review with coach', price: 569, desc: 'A comprehensive blood panel paired with a 45-minute coaching session to review results, optimize health strategies, and create an actionable plan.', url: 'https://marekdiagnostics.com/products/total-health-panel-comprehensive' },
     { name: 'InsideTracker Ultimate Panel', partner: 'InsideTracker', extra: 'InsideTracker Membership', price: 355, desc: 'The most comprehensive InsideTracker panel — tests dozens of biomarkers spanning heart health, metabolism, inflammation, hormones, and more, plus full platform access with personalized recommendations.', url: 'https://www.insidetracker.com/product/ultimate' },
@@ -1640,7 +1652,8 @@ let bwState = {
     customer: null,
     cart: [], // { name, price, category, code? }
     activeCategory: 'individual',
-        search: ''
+        search: '',
+        showCount: 120
 };
 
 // ============================================
@@ -1731,6 +1744,7 @@ function renderCategoryTabs() {
 
 function switchCategory(cat) {
     bwState.activeCategory = cat;
+    bwState.showCount = 120;
     renderCategoryTabs();
     renderItems();
 }
@@ -1749,100 +1763,86 @@ function renderItems() {
     const container = document.getElementById('bw-items');
     const countEl = document.getElementById('bw-count');
     const q = (bwState.search || '').toLowerCase().trim();
-    let items = [];
+    let html = '';
 
     if (bwState.activeCategory === 'individual') {
-        for (const m of INDIVIDUAL_MARKERS) {
-            const hay = (m.name + ' ' + m.desc + ' ' + (m.kw||'') + ' ' + m.code).toLowerCase();
-            if (q && hay.indexOf(q) === -1) continue;
-            items.push({
-                id: `ind_${m.code}`,
-                html: `<div class="flex items-start justify-between gap-3">
-                    <div class="flex-1 min-w-0">
-                        <h4 class="font-bold text-sm">${m.name} <span class="code-label">${m.code}</span></h4>
-                        ${descBlockHtml(m.desc)}
-                    </div>
-                    <div class="text-right shrink-0">
-                        <span class="font-bold text-blue-600">$${m.price}</span>
-                    </div>
-                </div>`,
-                name: `${m.name} (${m.code})`, price: m.price
-            });
+        if (!q) {
+            const popular = POPULAR_MARKERS.map(n => IND_BY_NAME[n]).filter(Boolean);
+            const popCodes = new Set(popular.map(m => m.code));
+            const rest = INDIVIDUAL_MARKERS.filter(m => !popCodes.has(m.code));
+            const restShown = rest.slice(0, bwState.showCount);
+            html += bwSectionHeader('Most popular', 'Commonly ordered markers');
+            html += popular.map(m => bwCard('ind_' + m.code, m.name + ' (' + m.code + ')', m.price, markerInner(m))).join('');
+            html += bwSectionHeader('All tests (A\u2013Z)', INDIVIDUAL_MARKERS.length.toLocaleString() + ' available');
+            html += restShown.map(m => bwCard('ind_' + m.code, m.name + ' (' + m.code + ')', m.price, markerInner(m))).join('');
+            const remaining = rest.length - restShown.length;
+            if (remaining > 0) html += bwLoadMore(remaining);
+            if (countEl) countEl.textContent = 'Search by name or what it measures — e.g. thyroid, vitamin D, testosterone.';
+            container.innerHTML = html;
+            return;
         }
-    } else if (bwState.activeCategory === 'panels') {
-        PANELS.forEach((p, i) => {
-            const hay = (p.name+' '+p.desc+' '+p.partner+' '+p.extra).toLowerCase();
-            if (q && hay.indexOf(q) === -1) return;
-            const learnLink = p.url ? `<a href="${p.url}" target="_blank" onclick="event.stopPropagation()" class="text-blue-500 text-xs font-semibold hover:underline mt-1 inline-block">Learn more at ${p.partner} →</a>` : '';
-            items.push({
-                id: `pnl_${i}`,
-                html: `<div class="flex items-start justify-between gap-3">
-                    <div class="flex-1 min-w-0">
-                        <h4 class="font-bold text-sm">${p.name}</h4>
-                        <div class="powered-by mb-1">Powered by ${p.partner} <span class="review-tag">+ ${p.extra}</span></div>
-                        ${descBlockHtml(p.desc)}
-                        ${learnLink}
-                    </div>
-                    <div class="text-right shrink-0">
-                        <span class="font-bold text-blue-600">$${p.price.toFixed(2)}</span>
-                    </div>
-                </div>`,
-                name: `${p.name} + ${p.extra}`, price: p.price
-            });
-        });
-    } else {
-        AT_HOME_KITS.forEach((k, i) => {
-            const hay = (k.name+' '+k.desc).toLowerCase();
-            if (q && hay.indexOf(q) === -1) return;
-            items.push({
-                id: `kit_${i}`,
-                html: `<div class="flex items-start justify-between gap-3">
-                    <div class="flex-1 min-w-0">
-                        <h4 class="font-bold text-sm">${k.name}</h4>
-                        ${descBlockHtml(k.desc)}
-                    </div>
-                    <div class="text-right shrink-0">
-                        <span class="font-bold text-blue-600">$${k.price.toFixed(2)}</span>
-                    </div>
-                </div>`,
-                name: k.name, price: k.price
-            });
-        });
-    }
-
-    const total = items.length;
-    const CAP = q ? 300 : 120;
-    const shown = items.slice(0, CAP);
-
-    if (countEl) {
-        if (bwState.activeCategory === 'individual') {
-            if (q) {
-                countEl.textContent = `${total} result${total!==1?'s':''}` + (total>CAP?` — showing first ${CAP}, keep typing to narrow` : '');
-            } else {
-                countEl.textContent = `${INDIVIDUAL_MARKERS.length.toLocaleString()} tests available — showing ${Math.min(CAP,total)}. Search by name or what it measures (e.g. “thyroid”, “vitamin D”).`;
-            }
-        } else {
-            countEl.textContent = total ? `${total} option${total!==1?'s':''}` : '';
+        const matches = INDIVIDUAL_MARKERS.filter(m =>
+            (m.name + ' ' + m.desc + ' ' + (m.kw || '') + ' ' + m.code).toLowerCase().indexOf(q) > -1);
+        if (countEl) countEl.textContent = matches.length + ' result' + (matches.length !== 1 ? 's' : '') + ' for “' + q + '”';
+        if (matches.length === 0) {
+            container.innerHTML = `<div class="md:col-span-2 text-center text-gray-400 py-12">No matches for “${escBw(q)}”. Try a different term.</div>`;
+            return;
         }
-    }
-
-    if (total === 0) {
-        container.innerHTML = `<div class="md:col-span-2 text-center text-gray-400 py-12">No matches for “${escBw(q)}”. Try a different term.</div>`;
+        const shown = matches.slice(0, bwState.showCount);
+        html += shown.map(m => bwCard('ind_' + m.code, m.name + ' (' + m.code + ')', m.price, markerInner(m))).join('');
+        const remaining = matches.length - shown.length;
+        if (remaining > 0) html += bwLoadMore(remaining);
+        container.innerHTML = html;
         return;
     }
 
-    container.innerHTML = shown.map(item => {
-        const inCart = bwState.cart.find(c => c.id === item.id);
-        return `
-        <div class="bw-item glass-card rounded-xl p-4 border-2 ${inCart ? 'in-cart border-blue-400' : 'border-transparent'}" onclick="toggleCartItem('${item.id}', '${encodeURIComponent(item.name)}', ${item.price})">
-            ${item.html}
-            ${inCart ? '<div class="mt-2 text-xs font-bold text-blue-600">✓ In Cart</div>' : ''}
-        </div>`;
-    }).join('');
+    // Panels / At-home kits (small curated lists)
+    const isPanels = bwState.activeCategory === 'panels';
+    const arr = isPanels ? PANELS : AT_HOME_KITS;
+    const filtered = arr.map((o, i) => ({ o, i })).filter(({ o }) =>
+        !q || ((o.name + ' ' + o.desc + ' ' + (o.partner || '') + ' ' + (o.extra || '')).toLowerCase().indexOf(q) > -1));
+    if (countEl) countEl.textContent = filtered.length ? (filtered.length + ' option' + (filtered.length !== 1 ? 's' : '')) : '';
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="md:col-span-2 text-center text-gray-400 py-12">No matches for “${escBw(q)}”.</div>`;
+        return;
+    }
+    if (isPanels) {
+        html = filtered.map(({ o: p, i }) => bwCard('pnl_' + i, p.name + ' + ' + p.extra, p.price, panelInner(p))).join('');
+    } else {
+        html = filtered.map(({ o: k, i }) => bwCard('kit_' + i, k.name, k.price, kitInner(k))).join('');
+    }
+    container.innerHTML = html;
+}
+
+// ---- shared card builders ----
+function bwCard(id, name, price, inner) {
+    const inCart = bwState.cart.find(c => c.id === id);
+    return `<div class="bw-item glass-card rounded-xl p-4 border-2 ${inCart ? 'in-cart border-blue-400' : 'border-transparent'}" onclick="toggleCartItem('${id}', '${encodeURIComponent(name)}', ${price})">${inner}${inCart ? '<div class="mt-2 text-xs font-bold text-blue-600">✓ In Cart</div>' : ''}</div>`;
+}
+function markerInner(m) {
+    return `<div class="flex items-start justify-between gap-3"><div class="flex-1 min-w-0"><h4 class="font-bold text-sm">${m.name} <span class="code-label">${m.code}</span></h4>${descBlockHtml(m.desc)}</div><div class="text-right shrink-0"><span class="font-bold text-blue-600">$${m.price}</span></div></div>`;
+}
+function panelInner(p) {
+    const learnLink = p.url ? `<a href="${p.url}" target="_blank" onclick="event.stopPropagation()" class="text-blue-500 text-xs font-semibold hover:underline mt-1 inline-block">Learn more at ${p.partner} →</a>` : '';
+    return `<div class="flex items-start justify-between gap-3"><div class="flex-1 min-w-0"><h4 class="font-bold text-sm">${p.name}</h4><div class="powered-by mb-1">Powered by ${p.partner} <span class="review-tag">+ ${p.extra}</span></div>${descBlockHtml(p.desc)}${learnLink}</div><div class="text-right shrink-0"><span class="font-bold text-blue-600">$${p.price.toFixed(2)}</span></div></div>`;
+}
+function kitInner(k) {
+    return `<div class="flex items-start justify-between gap-3"><div class="flex-1 min-w-0"><h4 class="font-bold text-sm">${k.name}</h4>${descBlockHtml(k.desc)}</div><div class="text-right shrink-0"><span class="font-bold text-blue-600">$${k.price.toFixed(2)}</span></div></div>`;
+}
+function bwSectionHeader(label, sub) {
+    return `<div class="md:col-span-2 mt-3 mb-1"><h3 class="text-xs font-extrabold text-gray-800 uppercase tracking-wider">${label}</h3>${sub ? `<p class="text-xs text-gray-400">${sub}</p>` : ''}</div>`;
+}
+function bwLoadMore(n) {
+    return `<div class="md:col-span-2 text-center mt-3"><button onclick="loadMoreItems()" class="btn-secondary px-6 py-2 rounded-full text-sm font-semibold">Show more tests (${n.toLocaleString()} more)</button></div>`;
+}
+function loadMoreItems() {
+    bwState.showCount += 120;
+    renderItems();
 }
 
 function filterItems(v) {
     bwState.search = v || '';
+    bwState.showCount = 120;
     renderItems();
 }
 
@@ -2002,6 +2002,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('bw-email').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') checkBwEmail();
     });
+
+    // Bind search here too, so it works even if the inline oninput handler is stripped by the host.
+    const searchInput = document.getElementById('bw-search');
+    if (searchInput) searchInput.addEventListener('input', (e) => filterItems(e.target.value));
 });
 </script>
 
