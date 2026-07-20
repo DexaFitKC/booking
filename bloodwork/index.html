@@ -1841,8 +1841,10 @@ function loadMoreItems() {
 }
 
 function filterItems(v) {
-    bwState.search = v || '';
-    bwState.showCount = 120;
+    v = v || '';
+    if (v === bwState.search) return;   // ignore duplicate events (inline + bound handler)
+    bwState.search = v;
+    bwState.showCount = 120;            // reset pagination on every new query
     renderItems();
 }
 
@@ -2203,15 +2205,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 
 <script>
-// Search/filter functionality
-function filterItems(query) {
-    const q = query.toLowerCase().trim();
-    const cards = document.querySelectorAll('#bw-items .bw-item');
-    cards.forEach(card => {
-        const text = card.textContent.toLowerCase();
-        card.style.display = text.includes(q) ? '' : 'none';
-    });
-}
+// (Legacy DOM-based filterItems removed — search is handled by the data-based filterItems above.)
 
 function toggleBwDesc(btn) {
     const wrapper = btn.parentElement;
