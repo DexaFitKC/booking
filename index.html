@@ -20,8 +20,6 @@
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://js.stripe.com/v3/"></script>
-    <!-- WORLD CUP PROMO (TEMPORARY) -->
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
     <!-- Meta Pixel Code -->
     <script>
     !function(f,b,e,v,n,t,s)
@@ -185,19 +183,70 @@
             border-radius: 2rem;
         }
 
+        /* ============================================
+           SERVICE CARDS — selection clarity (esp. mobile)
+           ============================================ */
         .service-card {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
+            position: relative;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        .service-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        /* Two-class selector so the card outline is deterministic regardless of
+           whether Tailwind's utilities are injected before or after this sheet. */
+        .service-card.glass-card {
+            border: 2px solid #e2e8f0;
         }
 
-        .service-card.selected {
+        /* Lift + shadow ONLY on real pointer devices. On touch screens the :hover
+           state sticks after a tap, which left the previously-tapped card looking
+           active and made it easy to mistake which service was selected. */
+        @media (hover: hover) and (pointer: fine) {
+            .service-card:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            }
+        }
+
+        .service-card.glass-card.selected {
             border-color: var(--brand-primary);
-            background: linear-gradient(135deg, rgba(70, 165, 252, 0.05) 0%, rgba(70, 165, 252, 0.1) 100%);
+            background: linear-gradient(135deg, rgba(70, 165, 252, 0.10) 0%, rgba(70, 165, 252, 0.18) 100%);
+            box-shadow: 0 0 0 3px rgba(70, 165, 252, 0.28);
+        }
+
+        /* Pressed feedback so a tap is obviously registering on the RIGHT card */
+        .service-card:active {
+            transform: scale(0.985);
+        }
+
+        /* Big, unmissable state banner at the bottom of every card. The small
+           checkbox at the top-right is often scrolled off screen on a phone. */
+        .select-indicator {
+            background: #f1f5f9;
+            color: #64748b;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+        .service-card.selected .select-indicator {
+            background: var(--brand-primary);
+            color: #ffffff;
+        }
+        .service-card .si-on  { display: none; }
+        .service-card.selected .si-off { display: none; }
+        .service-card.selected .si-on  { display: inline; }
+
+        /* Keep price/duration on one line — when these wrapped on narrow screens
+           the card grew taller mid-scroll and shifted the cards below it. */
+        .service-card .base-duration,
+        .service-card .addon-duration,
+        .service-card .base-price,
+        .service-card .addon-price {
+            white-space: nowrap;
+        }
+
+        /* Only the link text itself is clickable, not the full row */
+        .example-report-link {
+            padding: 4px 2px;
         }
 
         .time-slot {
@@ -350,7 +399,7 @@
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        @media (pers-reduced-motion: reduce) {
+        @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
                 animation-duration: 0.01ms !important;
                 animation-iteration-count: 1 !important;
@@ -710,7 +759,12 @@ function escapeHtml(value) {
                         </div>
                     </div>
 
-                    <div id="services-grid" class="grid md:grid-cols-2 gap-6 mb-8">
+                    <!-- ===== INCLUDED THIS MONTH =====
+                         Content is driven entirely by the MONTHLY_SPECIALS object
+                         near the top of the main script block. Edit it there. -->
+                    <div id="monthly-specials" class="mb-8"></div>
+
+                    <div id="services-grid" class="grid md:grid-cols-2 gap-8 md:gap-6 mb-8">
                         <!-- Services loaded dynamically -->
                     </div>
 
@@ -725,8 +779,6 @@ function escapeHtml(value) {
                                 <p class="text-sm text-gray-500">Estimated Cost</p>
                                 <p id="total-price" class="text-2xl font-bold">$0.00</p>
                                 <p id="credit-usage-note" class="text-sm text-green-600 hidden"></p>
-                                <!-- WORLD CUP PROMO (TEMPORARY) -->
-                                <p id="worldcup-promo-note" class="text-sm font-semibold text-green-600 hidden"></p>
                             </div>
                             <button onclick="continueToSchedule()" id="continue-schedule-btn" 
                                     class="btn-primary px-8 py-4 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed" 
@@ -800,6 +852,9 @@ function escapeHtml(value) {
                         <p class="text-gray-600">Just a few more details</p>
                     </div>
             
+                    <!-- ===== FINAL REVIEW: everything being booked ===== -->
+                    <div id="final-booking-summary" class="mb-6"></div>
+
                     <div class="glass-card rounded-3xl p-8 shadow-xl">
                         <form id="booking-details-form" onsubmit="submitBooking(event)">
                             <!-- Dynamic Height/Weight Section -->
@@ -1669,6 +1724,128 @@ function escapeHtml(value) {
     </div>
 
     <script>
+        /* ==========================================================================
+           INCLUDED THIS MONTH  —  ⭐ EDIT THIS BLOCK EACH MONTH ⭐
+           --------------------------------------------------------------------------
+           This is display-only marketing copy. Nothing here is wired into pricing,
+           availability, or the booking record — with the single exception of items
+           flagged `selectedAtBooking: true`, which are already handled by the
+           existing "review my results" question after service selection.
+
+           To update for a new month, change `month`, `totalValue`, and the `items`
+           array below. Set `enabled: false` to hide the banner entirely.
+           ========================================================================== */
+        const MONTHLY_SPECIALS = {
+            enabled: true,
+
+            // '' = auto-fills the current month + year (e.g. "July 2026").
+            // Set a string like 'August 2026' to pin it manually.
+            month: '',
+
+            // Combined estimated value shown in the header pill.
+            totalValue: '$200',
+
+            // Which services unlock the specials (shown as text only).
+            qualifierText: 'any main service (DEXA, RMR, VO2 Max, or Arterial Assessment)',
+
+            // Service IDs that qualify — used to decide whether the specials appear
+            // on the final review screen. 1=DEXA, 2=RMR, 3=VO2 Max, 7=Arterial.
+            qualifyingServiceIds: ['1', '2', '3', '7'],
+
+            /* ---- The list. Keep the item most likely to change month-to-month first. ----
+               title             : bold headline for the item
+               detail            : small grey supporting line ('' to omit)
+               value             : optional per-item estimate, e.g. '$120' ('' to omit)
+               selectedAtBooking : true if the customer opts in during booking rather
+                                   than by asking in person (currently the data review)
+            */
+            items: [
+                {
+                    title: 'Prepaid Bloodwork Order (through LabCorp)',
+                    detail: 'ApoB, Lipid Panel, HbA1c, Insulin',
+                    value: '',
+                    selectedAtBooking: false
+                },
+                {
+                    title: 'Expert Fitness / Nutrition Consultation',
+                    detail: 'Dedicated time with a real expert',
+                    value: '',
+                    selectedAtBooking: false
+                },
+                {
+                    title: '15-Minute Technician Data Review',
+                    detail: 'Understand your data before you leave',
+                    value: '',
+                    selectedAtBooking: true
+                }
+            ]
+        };
+
+        function specialsMonthLabel() {
+            if (MONTHLY_SPECIALS.month) return MONTHLY_SPECIALS.month;
+            const names = ['January','February','March','April','May','June',
+                           'July','August','September','October','November','December'];
+            const d = new Date();
+            return names[d.getMonth()] + ' ' + d.getFullYear();
+        }
+
+        function renderMonthlySpecials() {
+            const el = document.getElementById('monthly-specials');
+            if (!el) return;
+
+            if (!MONTHLY_SPECIALS.enabled || !MONTHLY_SPECIALS.items.length) {
+                el.innerHTML = '';
+                el.classList.add('hidden');
+                return;
+            }
+            el.classList.remove('hidden');
+
+            const rows = MONTHLY_SPECIALS.items.map(item => `
+                <li class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <div class="min-w-0">
+                        <p class="font-bold text-gray-900 leading-snug">
+                            ${item.title}
+                            ${item.value ? `<span class="ml-1 text-emerald-700 font-semibold whitespace-nowrap">(${item.value} value)</span>` : ''}
+                        </p>
+                        ${item.detail ? `<p class="text-sm text-gray-600 leading-snug">${item.detail}</p>` : ''}
+                        ${item.selectedAtBooking ? `<p class="text-xs font-semibold text-blue-600 mt-1">You'll choose this during booking — just answer "Yes" after selecting your services.</p>` : ''}
+                    </div>
+                </li>`).join('');
+
+            const askInPerson = MONTHLY_SPECIALS.items.filter(i => !i.selectedAtBooking);
+            const atBooking   = MONTHLY_SPECIALS.items.filter(i =>  i.selectedAtBooking);
+
+            let footer = '';
+            if (askInPerson.length) {
+                footer += `These are automatically included — there's nothing to add to your cart. Just let us know you're interested when you arrive.`;
+            }
+            if (atBooking.length) {
+                const names = atBooking.map(i => i.title).join(' and ');
+                footer += `${footer ? ' ' : ''}The one exception is the <span class="font-semibold">${names}</span>, which you select during booking on the next screen.`;
+            }
+
+            el.innerHTML = `
+            <div class="rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm cursor-default">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <h3 class="text-lg sm:text-xl font-black text-emerald-900">
+                        ✨ Included This Month — ${specialsMonthLabel()}
+                    </h3>
+                    ${MONTHLY_SPECIALS.totalValue ? `
+                        <span class="inline-block bg-emerald-600 text-white text-sm font-bold px-3 py-1.5 rounded-full whitespace-nowrap">
+                            ~${MONTHLY_SPECIALS.totalValue} value — FREE
+                        </span>` : ''}
+                </div>
+                <p class="text-sm text-gray-700 mb-4">
+                    Included at no extra cost with <span class="font-semibold">${MONTHLY_SPECIALS.qualifierText}</span>:
+                </p>
+                <ul class="space-y-3 mb-4">${rows}</ul>
+                <p class="text-sm text-emerald-900 bg-emerald-100/70 rounded-xl px-4 py-3">${footer}</p>
+            </div>`;
+        }
+
         // ============================================
         // STATE MANAGEMENT
         // ============================================
@@ -1717,23 +1894,6 @@ function escapeHtml(value) {
             customerSearch: '',
             creditSearch: ''
         };
-
-        // ===== WORLD CUP PROMO (TEMPORARY) — delete this whole block to remove =====
-        const WORLD_CUP_PROMO_ENABLED  = true;          // ← flip to false to turn off instantly
-        const WORLD_CUP_PROMO_IDS      = ['1', '2', '3']; // DEXA, RMR, VO2 Max
-        const WORLD_CUP_PROMO_DISCOUNT = 50;            // dollars off
-        let   worldCupPromoWasQualified = false;        // internal: gates the confetti
-        function isWorldCupPromoQualified() {
-            return WORLD_CUP_PROMO_ENABLED &&
-                WORLD_CUP_PROMO_IDS.every(id => state.selectedServices.includes(id));
-        }
-        function fireWorldCupConfetti() {
-            if (typeof confetti !== 'function') return;
-            confetti({ particleCount: 90, spread: 70, angle: 60,  origin: { x: 0, y: 0.65 } });
-            confetti({ particleCount: 90, spread: 70, angle: 120, origin: { x: 1, y: 0.65 } });
-            setTimeout(() => confetti({ particleCount: 120, spread: 100, origin: { y: 0.6 } }), 200);
-        }
-        // ===== END WORLD CUP PROMO =====
 
         // ============================================
         // NAVIGATION
@@ -2111,7 +2271,29 @@ function escapeHtml(value) {
             return '';
         }
 
+        // ---- Mobile scroll-vs-tap guard -------------------------------------
+        // A flick that ends on a service card can still fire a click. Track how far
+        // the finger travelled and ignore the click if it was really a scroll.
+        let __touchStartX = 0, __touchStartY = 0, __touchWasDrag = false;
+        document.addEventListener('touchstart', function (e) {
+            if (!e.touches || !e.touches.length) return;
+            __touchStartX = e.touches[0].clientX;
+            __touchStartY = e.touches[0].clientY;
+            __touchWasDrag = false;
+        }, { passive: true });
+        document.addEventListener('touchmove', function (e) {
+            if (!e.touches || !e.touches.length) return;
+            if (Math.abs(e.touches[0].clientX - __touchStartX) > 10 ||
+                Math.abs(e.touches[0].clientY - __touchStartY) > 10) {
+                __touchWasDrag = true;
+            }
+        }, { passive: true });
+        // ---------------------------------------------------------------------
+
         function toggleService(serviceId) {
+            // Was this a scroll rather than a deliberate tap? Ignore it.
+            if (__touchWasDrag) { __touchWasDrag = false; return; }
+
             const index = state.selectedServices.indexOf(serviceId);
             const card = document.querySelector(`[data-service-id="${serviceId}"]`);
             
@@ -2121,12 +2303,14 @@ function escapeHtml(value) {
                 card.querySelector('.service-checkbox').classList.remove('bg-blue-500', 'border-blue-500');
                 card.querySelector('.service-checkbox').classList.add('border-gray-300');
                 card.querySelector('.check-icon').classList.add('hidden');
+                card.setAttribute('aria-pressed', 'false');
             } else {
                 state.selectedServices.push(serviceId);
                 card.classList.add('selected');
                 card.querySelector('.service-checkbox').classList.add('bg-blue-500', 'border-blue-500');
                 card.querySelector('.service-checkbox').classList.remove('border-gray-300');
                 card.querySelector('.check-icon').classList.remove('hidden');
+                card.setAttribute('aria-pressed', 'true');
             }
         
             updateOrderSummary();
@@ -2143,6 +2327,7 @@ function escapeHtml(value) {
         }
 
         async function loadServices() {
+            renderMonthlySpecials();
             const container = document.getElementById('services-grid');
             container.innerHTML = `<div class="spinner"></div>`;
         
@@ -2184,8 +2369,12 @@ function escapeHtml(value) {
                     ? `<span class="desc-full hidden">${shortDesc}</span><button class="text-blue-500 text-xs ml-1 hover:underline" onclick="event.stopPropagation(); toggleDesc(this)">Show more</button>`
                     : '';
         
+                // NOTE: the anchor is inline-flex inside a block wrapper, so the
+                // clickable area is the TEXT ONLY. Previously it was `block`, which
+                // made the whole row clickable and bounced people off-site when they
+                // tapped empty space beside it while trying to select the service.
                 const exampleLink = service.exampleReportUrl
-                    ? `<a href="${service.exampleReportUrl}" target="_blank" onclick="event.stopPropagation()" class="block mt-2 text-blue-500 text-xs font-semibold hover:underline">📄 See an example report</a>`
+                    ? `<div class="mt-2"><a href="${service.exampleReportUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="example-report-link inline-flex items-center gap-1 text-blue-500 text-xs font-semibold hover:underline">📄 See an example report</a></div>`
                     : '';
         
                 const iconImg = service.iconUrl
@@ -2193,8 +2382,10 @@ function escapeHtml(value) {
                     : '';
         
                 return `
-                <div class="service-card glass-card rounded-2xl p-6 border-2 border-transparent cursor-pointer" 
-                     data-service-id="${service.id}" onclick="toggleService('${service.id}')">
+                <div class="service-card glass-card rounded-2xl p-6 cursor-pointer select-none" 
+                     data-service-id="${service.id}" role="button" tabindex="0" aria-pressed="false"
+                     onclick="toggleService('${service.id}')"
+                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleService('${service.id}');}">
                     <div class="flex items-start justify-between mb-4">
                         <div class="flex items-center gap-3">
                             ${iconImg}
@@ -2234,6 +2425,10 @@ function escapeHtml(value) {
                                 </span>
                             ` : ''}
                         </div>
+                    </div>
+                    <div class="select-indicator mt-4 rounded-xl py-3 text-center text-sm font-bold">
+                        <span class="si-off">Tap to select</span>
+                        <span class="si-on">✓ Selected</span>
                     </div>
                     ${getCreditBadge(service)}
                 </div>`;
@@ -2373,6 +2568,7 @@ function escapeHtml(value) {
             let totalDuration = 0;
             let totalPrice = 0;
             let creditsUsedCount = 0;
+            const lineItems = [];   // captured for the final review screen
         
             if (!state.services || state.services.length === 0) return;
         
@@ -2399,6 +2595,13 @@ function escapeHtml(value) {
                 if (hasCredit) {
                     creditsUsedCount++;
                     totalDuration += (service.addonDuration || service.duration);
+                    lineItems.push({
+                        id: service.id,
+                        name: service.name,
+                        duration: (service.addonDuration || service.duration),
+                        price: 0,
+                        creditUsed: true
+                    });
                 } else {
                     let price = service.price;
                     let duration = service.duration;
@@ -2429,28 +2632,16 @@ function escapeHtml(value) {
         
                     totalPrice += price;
                     totalDuration += duration;
+                    lineItems.push({
+                        id: service.id,
+                        name: service.name,
+                        duration: duration,
+                        price: price,
+                        creditUsed: false
+                    });
                 }
             });
 
-            // ===== WORLD CUP PROMO (TEMPORARY) =====
-            const promoNote = document.getElementById('worldcup-promo-note');
-            const promoQualified = isWorldCupPromoQualified();
-            if (promoQualified) {
-                const preDiscount = totalPrice;
-                totalPrice = Math.max(0, totalPrice - WORLD_CUP_PROMO_DISCOUNT);
-                if (promoNote) {
-                    promoNote.classList.remove('hidden');
-                    promoNote.innerHTML =
-                        `🌎⚽ World Cup Special — $${WORLD_CUP_PROMO_DISCOUNT} OFF the DEXA + RMR + VO2 Max bundle! ` +
-                        `<s class="text-gray-400 font-normal">$${preDiscount.toFixed(2)}</s> ` +
-                        `<span class="font-bold">$${totalPrice.toFixed(2)}</span>`;
-                }
-                if (!worldCupPromoWasQualified) fireWorldCupConfetti();
-            } else if (promoNote) {
-                promoNote.classList.add('hidden');
-            }
-            worldCupPromoWasQualified = promoQualified;
-            // ===== END WORLD CUP PROMO =====
         
             // 4. Gift Card Logic (Existing)
             const activeGC = state.giftCards.find(gc => gc.used < 1 && gc.name.toLowerCase() === 'gc');
@@ -2464,6 +2655,9 @@ function escapeHtml(value) {
         
             state.totalDuration = totalDuration;
             state.totalPrice = Math.max(0, totalPrice);
+            state.lineItems = lineItems;
+            state.gcApplied = gcApplied;
+            state.creditsUsedCount = creditsUsedCount;
         
             // 5. Update UI
             document.getElementById('total-duration').textContent = `${totalDuration} min`;
@@ -2680,7 +2874,117 @@ function escapeHtml(value) {
             }
         }
 
+        function renderBookingSummary() {
+            const el = document.getElementById('final-booking-summary');
+            if (!el) return;
+
+            // Make sure totals/line items reflect the final selection
+            updateOrderSummary();
+
+            const items = state.lineItems || [];
+            if (!items.length) { el.innerHTML = ''; return; }
+
+            // ---- Date & time ----
+            let whenHtml = '';
+            if (state.selectedDate) {
+                const dateStr = state.selectedDate.toLocaleDateString('en-US', {
+                    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+                });
+                const timeStr = state.selectedTime ? formatTime(state.selectedTime) : '';
+                whenHtml = `
+                    <div class="flex items-start gap-3 pb-4 mb-4 border-b border-gray-200">
+                        <svg class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        <div>
+                            <p class="font-bold text-gray-900">${dateStr}</p>
+                            ${timeStr ? `<p class="text-sm text-gray-600">${timeStr}</p>` : ''}
+                        </div>
+                    </div>`;
+            }
+
+            // ---- Booked services ----
+            const serviceRows = items.map(item => {
+                let priceLabel;
+                if (item.creditUsed)      priceLabel = '<span class="text-green-600 font-bold">Credit applied</span>';
+                else if (item.price === 0) priceLabel = '<span class="text-green-600 font-bold">Included</span>';
+                else                       priceLabel = `<span class="font-bold text-gray-900">$${item.price.toFixed(2)}</span>`;
+
+                const isReview = (item.id === CONSULTATION_ID);
+                return `
+                    <li class="flex items-start justify-between gap-4 py-2">
+                        <div class="min-w-0">
+                            <p class="font-semibold text-gray-900 leading-snug">${item.name}</p>
+                            <p class="text-xs text-gray-500">${item.duration} min${isReview ? ' • added because you asked us to review your results' : ''}</p>
+                        </div>
+                        <div class="text-right text-sm whitespace-nowrap">${priceLabel}</div>
+                    </li>`;
+            }).join('');
+
+            // ---- This month's included extras (only if a qualifying service is booked) ----
+            let specialsHtml = '';
+            const qualifies = MONTHLY_SPECIALS.enabled &&
+                MONTHLY_SPECIALS.items.length &&
+                state.selectedServices.some(id => MONTHLY_SPECIALS.qualifyingServiceIds.includes(id));
+
+            if (qualifies) {
+                // The data review is already listed above as a real booked service,
+                // so don't repeat it here.
+                const extras = MONTHLY_SPECIALS.items.filter(i => !i.selectedAtBooking);
+                if (extras.length) {
+                    const extraRows = extras.map(i => `
+                        <li class="flex items-start gap-2 py-1">
+                            <span class="text-emerald-600 font-bold flex-shrink-0">✓</span>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-gray-900 text-sm leading-snug">${i.title}${i.value ? ` <span class="text-emerald-700">(${i.value} value)</span>` : ''}</p>
+                                ${i.detail ? `<p class="text-xs text-gray-600">${i.detail}</p>` : ''}
+                            </div>
+                        </li>`).join('');
+
+                    specialsHtml = `
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                <p class="text-xs font-black uppercase tracking-wide text-emerald-700">Included This Month — No Charge</p>
+                                ${MONTHLY_SPECIALS.totalValue ? `<span class="text-xs font-bold text-emerald-700">~${MONTHLY_SPECIALS.totalValue} value</span>` : ''}
+                            </div>
+                            <ul>${extraRows}</ul>
+                            <p class="text-xs text-emerald-900 bg-emerald-50 rounded-lg px-3 py-2 mt-2">
+                                Nothing to do now — just let us know you're interested when you arrive.
+                            </p>
+                        </div>`;
+                }
+            }
+
+            // ---- Credits / gift card notes ----
+            let adjustments = '';
+            if (state.gcApplied > 0) {
+                adjustments += `<div class="flex items-center justify-between text-sm text-green-600 font-semibold"><span>Gift card applied</span><span>-$${state.gcApplied.toFixed(2)}</span></div>`;
+            }
+
+            el.innerHTML = `
+            <div class="glass-card rounded-3xl p-6 sm:p-8 shadow-xl border-2 border-blue-200">
+                <h3 class="text-xl font-black text-gray-900 mb-4">Your Booking</h3>
+                ${whenHtml}
+                <p class="text-xs font-black uppercase tracking-wide text-gray-500 mb-1">Services Booked</p>
+                <ul class="divide-y divide-gray-100">${serviceRows}</ul>
+                ${specialsHtml}
+                <div class="mt-4 pt-4 border-t-2 border-gray-200 space-y-1">
+                    ${adjustments}
+                    <div class="flex items-center justify-between text-sm text-gray-600">
+                        <span>Total time at our facility</span>
+                        <span class="font-bold text-gray-900">${state.totalDuration} min</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-gray-900">Estimated total</span>
+                        <span class="text-2xl font-black text-gray-900">$${state.totalPrice.toFixed(2)}</span>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-3">Payment is collected at your visit. Promo codes and gift cards can be applied at checkout.</p>
+            </div>`;
+        }
+
         async function loadQuestions() {
+            renderBookingSummary();
             const container = document.getElementById('questions-container');
             const newCustFields = document.getElementById('new-customer-fields');
             const hwSection = document.getElementById('hw-section');
