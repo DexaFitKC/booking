@@ -1781,14 +1781,6 @@ function escapeHtml(value) {
             ]
         };
 
-        function specialsMonthLabel() {
-            if (MONTHLY_SPECIALS.month) return MONTHLY_SPECIALS.month;
-            const names = ['January','February','March','April','May','June',
-                           'July','August','September','October','November','December'];
-            const d = new Date();
-            return names[d.getMonth()] + ' ' + d.getFullYear();
-        }
-
         function renderMonthlySpecials() {
             const el = document.getElementById('monthly-specials');
             if (!el) return;
@@ -1815,23 +1807,11 @@ function escapeHtml(value) {
                     </div>
                 </li>`).join('');
 
-            const askInPerson = MONTHLY_SPECIALS.items.filter(i => !i.selectedAtBooking);
-            const atBooking   = MONTHLY_SPECIALS.items.filter(i =>  i.selectedAtBooking);
-
-            let footer = '';
-            if (askInPerson.length) {
-                footer += `These are automatically included — there's nothing to add to your cart. Just let us know you're interested when you arrive.`;
-            }
-            if (atBooking.length) {
-                const names = atBooking.map(i => i.title).join(' and ');
-                footer += `${footer ? ' ' : ''}The one exception is the <span class="font-semibold">${names}</span>, which you select during booking on the next screen.`;
-            }
-
             el.innerHTML = `
             <div class="rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm cursor-default">
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <h3 class="text-lg sm:text-xl font-black text-emerald-900">
-                        ✨ Included This Month — ${specialsMonthLabel()}
+                        ✨ Included This Month
                     </h3>
                     ${MONTHLY_SPECIALS.totalValue ? `
                         <span class="inline-block bg-emerald-600 text-white text-sm font-bold px-3 py-1.5 rounded-full whitespace-nowrap">
@@ -1841,8 +1821,7 @@ function escapeHtml(value) {
                 <p class="text-sm text-gray-700 mb-4">
                     Included at no extra cost with <span class="font-semibold">${MONTHLY_SPECIALS.qualifierText}</span>:
                 </p>
-                <ul class="space-y-3 mb-4">${rows}</ul>
-                <p class="text-sm text-emerald-900 bg-emerald-100/70 rounded-xl px-4 py-3">${footer}</p>
+                <ul class="space-y-3 mb-0">${rows}</ul>
             </div>`;
         }
 
@@ -2944,12 +2923,12 @@ function escapeHtml(value) {
                     specialsHtml = `
                         <div class="mt-4 pt-4 border-t border-gray-200">
                             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                                <p class="text-xs font-black uppercase tracking-wide text-emerald-700">Included This Month — No Charge</p>
+                                <p class="text-xs font-black uppercase tracking-wide text-emerald-700">Included This Month | No Charge</p>
                                 ${MONTHLY_SPECIALS.totalValue ? `<span class="text-xs font-bold text-emerald-700">~${MONTHLY_SPECIALS.totalValue} value</span>` : ''}
                             </div>
                             <ul>${extraRows}</ul>
                             <p class="text-xs text-emerald-900 bg-emerald-50 rounded-lg px-3 py-2 mt-2">
-                                Nothing to do now — just let us know you're interested when you arrive.
+                                Nothing to do now, just let us know you're interested when you arrive.
                             </p>
                         </div>`;
                 }
@@ -2971,7 +2950,7 @@ function escapeHtml(value) {
                 <div class="mt-4 pt-4 border-t-2 border-gray-200 space-y-1">
                     ${adjustments}
                     <div class="flex items-center justify-between text-sm text-gray-600">
-                        <span>Total time at our facility</span>
+                        <span>Total time with us</span>
                         <span class="font-bold text-gray-900">${state.totalDuration} min</span>
                     </div>
                     <div class="flex items-center justify-between">
@@ -2979,7 +2958,7 @@ function escapeHtml(value) {
                         <span class="text-2xl font-black text-gray-900">$${state.totalPrice.toFixed(2)}</span>
                     </div>
                 </div>
-                <p class="text-xs text-gray-500 mt-3">Payment is collected at your visit. Promo codes and gift cards can be applied at checkout.</p>
+                <p class="text-xs text-gray-500 mt-3">Payment is collected at your visit. Promo codes, credits, and gift cards can be applied at checkout.</p>
             </div>`;
         }
 
