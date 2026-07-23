@@ -1724,41 +1724,19 @@ function escapeHtml(value) {
     </div>
 
     <script>
-        /* ==========================================================================
-           INCLUDED THIS MONTH  —  ⭐ EDIT THIS BLOCK EACH MONTH ⭐
-           --------------------------------------------------------------------------
-           This is display-only marketing copy. Nothing here is wired into pricing,
-           availability, or the booking record — with the single exception of items
-           flagged `selectedAtBooking: true`, which are already handled by the
-           existing "review my results" question after service selection.
-
-           To update for a new month, change `month`, `totalValue`, and the `items`
-           array below. Set `enabled: false` to hide the banner entirely.
-           ========================================================================== */
         const MONTHLY_SPECIALS = {
             enabled: true,
 
-            // '' = auto-fills the current month + year (e.g. "July 2026").
-            // Set a string like 'August 2026' to pin it manually.
             month: '',
 
-            // Combined estimated value shown in the header pill.
             totalValue: '$200',
 
-            // Which services unlock the specials (shown as text only).
             qualifierText: 'any main service (DEXA, RMR, VO2 Max, or Arterial Assessment)',
 
-            // Service IDs that qualify — used to decide whether the specials appear
-            // on the final review screen. 1=DEXA, 2=RMR, 3=VO2 Max, 7=Arterial.
+            // Service IDs that qualify
+            // 1=DEXA, 2=RMR, 3=VO2 Max, 7=Arterial.
             qualifyingServiceIds: ['1', '2', '3', '7'],
-
-            /* ---- The list. Keep the item most likely to change month-to-month first. ----
-               title             : bold headline for the item
-               detail            : small grey supporting line ('' to omit)
-               value             : optional per-item estimate, e.g. '$120' ('' to omit)
-               selectedAtBooking : true if the customer opts in during booking rather
-                                   than by asking in person (currently the data review)
-            */
+                
             items: [
                 {
                     title: 'Prepaid Bloodwork Order (through LabCorp)',
@@ -1803,7 +1781,7 @@ function escapeHtml(value) {
                             ${item.value ? `<span class="ml-1 text-emerald-700 font-semibold whitespace-nowrap">(${item.value} value)</span>` : ''}
                         </p>
                         ${item.detail ? `<p class="text-sm text-gray-600 leading-snug">${item.detail}</p>` : ''}
-                        ${item.selectedAtBooking ? `<p class="text-xs font-semibold text-blue-600 mt-1">You'll choose this during booking — just answer "Yes" after selecting your services.</p>` : ''}
+                        ${item.selectedAtBooking ? `<p class="text-xs font-semibold text-blue-600 mt-1">You'll choose this during booking, just answer "Yes" after selecting your services.</p>` : ''}
                     </div>
                 </li>`).join('');
 
