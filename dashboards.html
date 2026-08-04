@@ -829,25 +829,30 @@
       <button class="btn btn-secondary active" id="btn-referrer" onclick="setMktgMode('referrer')">Referrer Tracking</button>
       <button class="btn btn-secondary" id="btn-discount" onclick="setMktgMode('discount')">Discount Tracking</button>
       <button class="btn btn-secondary" id="btn-utmcont" onclick="setMktgMode('utmcont')">UTM Content</button>
+      <button class="btn btn-secondary" id="btn-monthly" onclick="setMktgMode('monthly')">Monthly Review</button>
     </div>
 
     <!-- Filters -->
     <div class="filter-bar">
       <div class="filter-row">
-        <div class="filter-group">
+        <div class="filter-group" id="mktg-start-group">
           <label>Start Date</label>
           <input type="date" id="mktg-start">
         </div>
-        <div class="filter-group">
+        <div class="filter-group" id="mktg-end-group">
           <label>End Date</label>
           <input type="date" id="mktg-end">
         </div>
-        <div class="filter-group">
+        <div class="filter-group" id="mktg-datetype-group">
           <label>Date Type</label>
           <div class="toggle-group">
             <button class="toggle-opt active" id="mktg-toggle-booked" onclick="setMktgDateType('booked')">Booked Within</button>
             <button class="toggle-opt" id="mktg-toggle-happened" onclick="setMktgDateType('happened')">Happened Within</button>
           </div>
+        </div>
+        <div class="filter-group hidden" id="mktg-month-group">
+          <label>Month Booked</label>
+          <input type="month" id="mktg-month">
         </div>
         <div class="filter-group grow" id="mktg-referrer-group">
           <label>Referrer</label>
@@ -865,7 +870,7 @@
         </div>
         <div class="filter-group">
           <label>&nbsp;</label>
-          <button class="btn btn-primary" onclick="runMktgFilter()">Apply Filters</button>
+          <button class="btn btn-primary" onclick="applyMktgFilters()">Apply Filters</button>
         </div>
       </div>
     </div>
@@ -878,6 +883,11 @@
 
     <div id="mktg-stats" class="hidden">
       <div class="stat-grid" id="mktg-stat-cards"></div>
+    </div>
+
+    <div id="mktg-monthly" class="hidden">
+      <div class="section-panel mb-3" id="mktg-monthly-summary"></div>
+      <div class="section-panel mb-3" id="mktg-monthly-table"></div>
     </div>
 
     <div id="mktg-empty" class="hidden" style="text-align:center;padding:40px;color:var(--text-muted);">
@@ -973,6 +983,7 @@ const STATE = {
   appointments: [],
   customers: [],
   customerMap: {},     // email -> customer
+  clockEntries: [],    // used by Operations only — must default to [] or renderTimeClock throws
   discountValues: [],
   mktgMode: 'referrer',
   mktgDateType: 'booked',
@@ -1092,9 +1103,11 @@ function loadData(type) {
     dashboardType: STATE.dashboardType
   })
 .then(function(result) {
-    const apptRows  = result.appointments || [];
-    const custRows  = result.customers    || [];
-    const clockRows = result.timeclock    || [];
+    // Coerce to arrays — a non-array payload (error object, string) would
+    // otherwise throw on .map() and leave STATE fields undefined.
+    const apptRows  = Array.isArray(result.appointments) ? result.appointments : [];
+    const custRows  = Array.isArray(result.customers)    ? result.customers    : [];
+    const clockRows = Array.isArray(result.timeclock)    ? result.timeclock    : [];
     loadingEl.classList.add('hidden');
 
     // Map to expected format
@@ -1116,12 +1129,17 @@ function loadData(type) {
       dob:   r.dob || ''
     }));
 
-    STATE.clockEntries = clockRows.map(r => ({
-      employee: r.employee || '',
-      clockIn: r.clock_in || '',
-      clockOut: r.clock_out || '',
-      hours: r.hours ? parseFloat(r.hours) : null
-    }));
+    STATE.clockEntries = clockRows.map(r => {
+      // parseFloat handles "8.5" and "8.5 hrs"; NaN/null/undefined all fall to 0
+      // so arithmetic downstream can never produce NaN totals.
+      const h = parseFloat(r.hours);
+      return {
+        employee: r.employee || 'Unassigned',
+        clockIn: r.clock_in || '',
+        clockOut: r.clock_out || '',
+        hours: isFinite(h) ? h : 0
+      };
+    });
 
     // Build discount dropdown values
     const discountSet = new Set();
@@ -1151,6 +1169,10 @@ function loadData(type) {
     if (type === 'marketing') {
       document.getElementById('mktg-start').value = fmt(ago90);
       document.getElementById('mktg-end').value = fmt(today);
+      // Monthly review defaults to the last full month — the one you'd actually review.
+      const prev = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      document.getElementById('mktg-month').value =
+        prev.getFullYear() + '-' + String(prev.getMonth() + 1).padStart(2, '0');
     } else {
       document.getElementById('ops-start').value = fmt(ago90);
       document.getElementById('ops-end').value = fmt(today);
@@ -1231,15 +1253,33 @@ function fmtDate(d) {
 // ─── MARKETING DASHBOARD LOGIC ───
 function setMktgMode(mode) {
   STATE.mktgMode = mode;
+  const monthly = mode === 'monthly';
+
   document.getElementById('btn-referrer').classList.toggle('active', mode === 'referrer');
   document.getElementById('btn-discount').classList.toggle('active', mode === 'discount');
   document.getElementById('btn-utmcont').classList.toggle('active', mode === 'utmcont');
+  document.getElementById('btn-monthly').classList.toggle('active', monthly);
+
   document.getElementById('mktg-referrer-group').classList.toggle('hidden', mode !== 'referrer');
   document.getElementById('mktg-discount-group').classList.toggle('hidden', mode !== 'discount');
   document.getElementById('mktg-utmcont-group').classList.toggle('hidden', mode !== 'utmcont');
+
+  // Monthly review defines its own period, so the free-form range controls
+  // are swapped out for a single month picker.
+  document.getElementById('mktg-start-group').classList.toggle('hidden', monthly);
+  document.getElementById('mktg-end-group').classList.toggle('hidden', monthly);
+  document.getElementById('mktg-datetype-group').classList.toggle('hidden', monthly);
+  document.getElementById('mktg-month-group').classList.toggle('hidden', !monthly);
+
   // Clear previous results
   document.getElementById('mktg-stats').classList.add('hidden');
+  document.getElementById('mktg-monthly').classList.add('hidden');
   document.getElementById('mktg-empty').classList.add('hidden');
+}
+
+function applyMktgFilters() {
+  if (STATE.mktgMode === 'monthly') runMonthlyReview();
+  else runMktgFilter();
 }
 
 function setMktgDateType(type) {
@@ -1296,7 +1336,215 @@ function runMktgFilter() {
   }
 
   document.getElementById('mktg-empty').classList.add('hidden');
+  document.getElementById('mktg-monthly').classList.add('hidden');
   renderMktgStats(completed, allFiltered);
+}
+
+// ─── MONTHLY REVIEW (AD-BASED REFERRERS) ───
+
+// Non-ad sources. Compared case-insensitively against the trimmed referrer,
+// so "Website1" / "website1" both match. Add new house sources here.
+const NON_AD_REFERRERS = ['website1', 'googleprof', 'clinical_trial'];
+
+function isAdReferrer(ref) {
+  const r = (ref || '').toString().trim().toLowerCase();
+  if (!r) return false;                                  // blank = not an ad source
+  return NON_AD_REFERRERS.indexOf(r) === -1;
+}
+
+// Tolerant numeric parse — est_cost may arrive as 150, "150", or "$150.00".
+function toNum(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  const n = parseFloat((v == null ? '' : v).toString().replace(/[^0-9.\-]/g, ''));
+  return isFinite(n) ? n : 0;
+}
+
+// Months since year 0 — lets us compare "which month" without timezone drift.
+function monthIndex(d) { return d.getFullYear() * 12 + d.getMonth(); }
+
+function runMonthlyReview() {
+  const monthVal = document.getElementById('mktg-month').value;   // "YYYY-MM"
+  if (!monthVal) { alert('Please select a month.'); return; }
+
+  const [selYear, selMonth] = monthVal.split('-').map(Number);
+  const selIndex = selYear * 12 + (selMonth - 1);
+
+  // Every appointment BOOKED in the selected month, from an ad-based referrer.
+  const booked = STATE.appointments.filter(a => {
+    if (!isAdReferrer(a.referrer)) return false;
+    const d = parseDate(a.bookingDate);
+    if (!d || isNaN(d)) return false;
+    return monthIndex(d) === selIndex;
+  });
+
+  if (booked.length === 0) {
+    document.getElementById('mktg-monthly').classList.add('hidden');
+    document.getElementById('mktg-stats').classList.add('hidden');
+    document.getElementById('mktg-empty').classList.remove('hidden');
+    return;
+  }
+
+  // Bucket by referrer. Classification is relative to the SELECTED month:
+  //   completed → funds collected
+  //   upcoming  → not completed, appointment falls in a later month
+  //   missed    → not completed, appointment falls in this month or earlier
+  // An unparseable appointment date can't be proven to be in the future, so it
+  // lands in missed rather than silently inflating upcoming.
+  const byRef = {};
+  booked.forEach(a => {
+    const ref = a.referrer.toString().trim();
+    if (!byRef[ref]) byRef[ref] = { ref: ref, completed: [], missed: [], upcoming: [] };
+
+    const status = (a.status || '').toString().trim().toLowerCase();
+    if (status === 'completed') {
+      byRef[ref].completed.push(a);
+    } else {
+      const ad = parseDate(a.apptDate);
+      if (ad && !isNaN(ad) && monthIndex(ad) > selIndex) byRef[ref].upcoming.push(a);
+      else byRef[ref].missed.push(a);
+    }
+  });
+
+  const rows = Object.values(byRef).sort((x, y) =>
+    (y.completed.length + y.missed.length + y.upcoming.length) -
+    (x.completed.length + x.missed.length + x.upcoming.length)
+  );
+
+  window._monthlyRows = rows;
+  document.getElementById('mktg-stats').classList.add('hidden');
+  document.getElementById('mktg-empty').classList.add('hidden');
+  renderMonthlyReview(rows, selYear, selMonth);
+}
+
+function showMonthlyDetail(rowIdx, bucket) {
+  const rows = window._monthlyRows || [];
+  const labels = {
+    completed: 'Completed — funds collected',
+    missed:    'Not completed — funds should have been collected',
+    upcoming:  'Upcoming — not yet due',
+    all:       'All appointments booked'
+  };
+  let appts, source;
+  if (rowIdx === -1) {
+    source = 'All ad referrers';
+    appts = bucket === 'all'
+      ? rows.reduce((acc, r) => acc.concat(r.completed, r.missed, r.upcoming), [])
+      : rows.reduce((acc, r) => acc.concat(r[bucket]), []);
+  } else {
+    const r = rows[rowIdx];
+    if (!r) return;
+    source = r.ref;
+    appts = bucket === 'all' ? r.completed.concat(r.missed, r.upcoming) : r[bucket];
+  }
+  showOpsDetail(source + ' — ' + labels[bucket], appts);
+}
+
+function renderMonthlyReview(rows, selYear, selMonth) {
+  const MONTHS = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  const monthLabel = MONTHS[selMonth - 1] + ' ' + selYear;
+
+  const sum = arr => arr.reduce((s, a) => s + toNum(a.cost), 0);
+  const tot = { cCount:0, cVal:0, mCount:0, mVal:0, uCount:0, uVal:0 };
+  rows.forEach(r => {
+    r.cVal = sum(r.completed); r.mVal = sum(r.missed); r.uVal = sum(r.upcoming);
+    tot.cCount += r.completed.length; tot.cVal += r.cVal;
+    tot.mCount += r.missed.length;    tot.mVal += r.mVal;
+    tot.uCount += r.upcoming.length;  tot.uVal += r.uVal;
+  });
+  const allCount = tot.cCount + tot.mCount + tot.uCount;
+  const allVal   = tot.cVal + tot.mVal + tot.uVal;
+  const collectRate = (tot.cCount + tot.mCount) > 0
+    ? tot.cCount / (tot.cCount + tot.mCount) * 100 : 0;
+
+  document.getElementById('mktg-monthly-summary').innerHTML = `
+    <div class="section-title">Ad Referrer Review — ${monthLabel}</div>
+    <div class="section-body">
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">
+        Appointments <strong>booked</strong> in ${monthLabel} from ad-based referrers.
+        Excludes ${NON_AD_REFERRERS.join(', ')} and appointments with no referrer.
+      </p>
+      <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));">
+        <div class="stat-card" style="cursor:pointer;" onclick="showMonthlyDetail(-1,'all')">
+          <div class="stat-label">Total Booked</div>
+          <div class="stat-value">${allCount}</div>
+          <div class="stat-sub">${fmtCurrency(allVal)} est. value</div>
+        </div>
+        <div class="stat-card" style="cursor:pointer; border-left: 4px solid var(--success);" onclick="showMonthlyDetail(-1,'completed')">
+          <div class="stat-label">Completed</div>
+          <div class="stat-value" style="color:var(--success);">${tot.cCount}</div>
+          <div class="stat-sub">${fmtCurrency(tot.cVal)} collected</div>
+        </div>
+        <div class="stat-card" style="cursor:pointer; border-left: 4px solid var(--danger);" onclick="showMonthlyDetail(-1,'missed')">
+          <div class="stat-label">Not Completed</div>
+          <div class="stat-value" style="color:var(--danger);">${tot.mCount}</div>
+          <div class="stat-sub">${fmtCurrency(tot.mVal)} not collected</div>
+        </div>
+        <div class="stat-card" style="cursor:pointer; border-left: 4px solid var(--warning);" onclick="showMonthlyDetail(-1,'upcoming')">
+          <div class="stat-label">Upcoming</div>
+          <div class="stat-value" style="color:var(--warning);">${tot.uCount}</div>
+          <div class="stat-sub">${fmtCurrency(tot.uVal)} not yet due</div>
+        </div>
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-label">Collection Rate</div>
+          <div class="stat-value">${fmtPct(collectRate)}</div>
+          <div class="stat-sub">Of appointments already due</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const cell = (idx, bucket, count, val, color) => count > 0
+    ? `<td style="text-align:center;cursor:pointer;" onclick="showMonthlyDetail(${idx},'${bucket}')">
+         <div style="font-weight:600;color:${color};">${count}</div>
+         <div style="font-size:11px;color:var(--text-muted);">${fmtCurrency(val)}</div>
+       </td>`
+    : `<td style="text-align:center;color:var(--text-muted);">—</td>`;
+
+  const body = rows.map((r, i) => `
+    <tr>
+      <td style="font-weight:600;white-space:normal;max-width:220px;">${r.ref}</td>
+      ${cell(i, 'completed', r.completed.length, r.cVal, 'var(--success)')}
+      ${cell(i, 'missed',    r.missed.length,    r.mVal, 'var(--danger)')}
+      ${cell(i, 'upcoming',  r.upcoming.length,  r.uVal, 'var(--warning)')}
+      <td style="text-align:center;cursor:pointer;" onclick="showMonthlyDetail(${i},'all')">
+        <div style="font-weight:600;">${r.completed.length + r.missed.length + r.upcoming.length}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${fmtCurrency(r.cVal + r.mVal + r.uVal)}</div>
+      </td>
+    </tr>
+  `).join('');
+
+  document.getElementById('mktg-monthly-table').innerHTML = `
+    <div class="section-title">Breakdown by Referrer</div>
+    <div class="section-body" style="padding:0;">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Referrer</th>
+              <th style="text-align:center;">Completed</th>
+              <th style="text-align:center;">Not Completed</th>
+              <th style="text-align:center;">Upcoming</th>
+              <th style="text-align:center;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${body}
+            <tr style="border-top:2px solid var(--brand-primary);background:#fafafa;">
+              <td style="font-weight:700;">All ad referrers</td>
+              <td style="text-align:center;font-weight:700;color:var(--success);">${tot.cCount}<div style="font-size:11px;font-weight:500;color:var(--text-muted);">${fmtCurrency(tot.cVal)}</div></td>
+              <td style="text-align:center;font-weight:700;color:var(--danger);">${tot.mCount}<div style="font-size:11px;font-weight:500;color:var(--text-muted);">${fmtCurrency(tot.mVal)}</div></td>
+              <td style="text-align:center;font-weight:700;color:var(--warning);">${tot.uCount}<div style="font-size:11px;font-weight:500;color:var(--text-muted);">${fmtCurrency(tot.uVal)}</div></td>
+              <td style="text-align:center;font-weight:700;">${allCount}<div style="font-size:11px;font-weight:500;color:var(--text-muted);">${fmtCurrency(allVal)}</div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);padding:12px 20px 4px;">Select any number to list those appointments.</p>
+    </div>
+  `;
+
+  document.getElementById('mktg-monthly').classList.remove('hidden');
 }
 
 function renderMktgStats(completed, all) {
@@ -1475,37 +1723,41 @@ function runOpsFilter() {
   renderOpsContent(filtered);
 }
 
+// Renders one section in isolation. Previously any single failure threw all the
+// way out of renderOpsContent, so the final `remove('hidden')` never ran and the
+// whole Operations page stayed blank. Now a broken section reports itself and
+// the other eight still display.
+function safeRender(sectionId, title, fn) {
+  try {
+    fn();
+  } catch (err) {
+    console.error('Section failed to render: ' + title, err);
+    const el = document.getElementById(sectionId);
+    if (el) {
+      el.innerHTML =
+        '<div class="section-title">' + title + '</div>' +
+        '<div class="section-body"><p style="color:var(--text-muted);">' +
+        'This section couldn\'t be built from the current data. ' +
+        'The rest of the dashboard is unaffected.</p></div>';
+    }
+  }
+}
+
 function renderOpsContent(appts) {
   const completed = appts.filter(a => a.status && a.status.toString().toLowerCase() === 'completed');
 
-  // ─── 1. Status Rates ───
-  renderStatusRates(appts);
-
-  // ─── 2. Appointment Count by DOW ───
-  renderApptByDow(appts);
-
-  // ─── 3. Service Count by Service by DOW ───
-  renderServiceByDow(completed);
-
-  // ─── 4. Average Lead Time ───
-  renderLeadTime(appts);
-
-  // ─── 5. Average Cost by DOW and Per Client ───
-  renderCostMetrics(completed);
-
-  // ─── 6. Customer Retention ───
-  renderRetention(appts);
-
-  // ─── 7. Revenue / Time Metrics ───
-  renderRevenueMetrics(completed, appts);
-
-  // ─── 8. Top 20 Customers ───
-  renderTop20(completed);
-
-  // ─── 9. Time Clock / Labor ───
-  renderTimeClock(appts, completed);
-
+  // Reveal first so the page is never left blank by a mid-render failure.
   document.getElementById('ops-content').classList.remove('hidden');
+
+  safeRender('ops-status-section',      'Appointment Status Rates',        () => renderStatusRates(appts));
+  safeRender('ops-dow-section',         'Appointments by Day of Week',     () => renderApptByDow(appts));
+  safeRender('ops-service-dow-section', 'Service Count by Day of Week',    () => renderServiceByDow(completed));
+  safeRender('ops-leadtime-section',    'Appointment Lead Time',           () => renderLeadTime(appts));
+  safeRender('ops-cost-section',        'Cost Metrics',                    () => renderCostMetrics(completed));
+  safeRender('ops-retention-section',   'Customer Retention',              () => renderRetention(appts));
+  safeRender('ops-revenue-section',     'Additional Insights',             () => renderRevenueMetrics(completed, appts));
+  safeRender('ops-top-section',         'Top 20 Customers',                () => renderTop20(completed));
+  safeRender('ops-timeclock-section',   'Time Clock & Labor Metrics',      () => renderTimeClock(appts, completed));
 }
 
 // Time clock function
@@ -1667,26 +1919,43 @@ function renderStatusRates(appts) {
   window._allFilteredAppts = appts;
 
   const total = appts.length;
-  const completedN = counts['Completed'] || 0;
-  const cancelledN = (counts['CustCancel'] || 0) + (counts['Canceled'] || 0);
-  const otherN = total - completedN - cancelledN;
+
+  // Single source of truth for status buckets. Previously the Cancelled count
+  // included CustCancel but its drill-down did not, and CustCancel also fell
+  // through into "Other" — so the three cards summed to more than the total.
+  const isCompleted = a => (a.status || '').toString().trim().toLowerCase() === 'completed';
+  const isCancelled = a => {
+    const s = (a.status || '').toString().trim().toLowerCase();
+    return s === 'custcancel' || s === 'canceled' || s === 'cancelled';
+  };
+  const completedList = appts.filter(isCompleted);
+  const cancelledList = appts.filter(isCancelled);
+  const otherList     = appts.filter(a => !isCompleted(a) && !isCancelled(a));
+
+  window._completedAppts = completedList;
+  window._cancelledAppts = cancelledList;
+  window._otherAppts     = otherList;
+
+  const completedN = completedList.length;
+  const cancelledN = cancelledList.length;
+  const otherN     = otherList.length;
 
   const section = document.getElementById('ops-status-section');
   section.innerHTML = `
     <div class="section-title">Appointment Status Rates</div>
     <div class="section-body">
       <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
-        <div class="stat-card" style="cursor:pointer; border-left: 4px solid var(--success);" onclick="showOpsDetail('Completed', window._statusAppts['Completed']||[])">
+        <div class="stat-card" style="cursor:pointer; border-left: 4px solid var(--success);" onclick="showOpsDetail('Completed', window._completedAppts||[])">
           <div class="stat-label">Completed</div>
           <div class="stat-value" style="color:var(--success);">${fmtPct(total ? completedN/total*100 : 0)}</div>
           <div class="stat-sub">${completedN} of ${total}</div>
         </div>
-        <div class="stat-card" style="cursor:pointer; border-left: 4px solid var(--danger);" onclick="showOpsDetail('Cancelled', (window._statusAppts['Cancelled']||[]).concat(window._statusAppts['Canceled']||[]))">
+        <div class="stat-card" style="cursor:pointer; border-left: 4px solid var(--danger);" onclick="showOpsDetail('Cancelled', window._cancelledAppts||[])">
           <div class="stat-label">Cancelled</div>
           <div class="stat-value" style="color:var(--danger);">${fmtPct(total ? cancelledN/total*100 : 0)}</div>
           <div class="stat-sub">${cancelledN} of ${total}</div>
         </div>
-        <div class="stat-card" style="cursor:pointer; border-left: 4px solid var(--warning);" onclick="showOpsDetail('Other Statuses', window._allFilteredAppts.filter(a=>{const s=(a.status||'').trim();return s!=='Completed'&&s!=='Cancelled'&&s!=='Canceled';}))">
+        <div class="stat-card" style="cursor:pointer; border-left: 4px solid var(--warning);" onclick="showOpsDetail('Other Statuses', window._otherAppts||[])">
           <div class="stat-label">Other</div>
           <div class="stat-value" style="color:var(--warning);">${fmtPct(total ? otherN/total*100 : 0)}</div>
           <div class="stat-sub">${otherN} of ${total}</div>
