@@ -5854,9 +5854,6 @@ async function callAppsScript(action, data = {}) {
   var TOKEN = new URLSearchParams(location.search).get('manage');
   if (!TOKEN) return;                       // normal booking page, do nothing
 
-  // Business hours shown on the reschedule picker. Adjust to your real hours.
-  var OPEN_HOUR = 0, CLOSE_HOUR = 24;
-
   var URL_ = (window.CONFIG && window.CONFIG.APPS_SCRIPT_URL) ||
     'https://script.google.com/macros/s/AKfycbyUCDh4GLd3nHyxh7Mil5Q6HUXJASbUC6ihuWIa_4tyW5j0SXYyFa766Fax31AMqZwfWw/exec';
 
@@ -5937,9 +5934,7 @@ async function callAppsScript(action, data = {}) {
     var area = $('mgSlots');
     area.innerHTML = '<div class="mg-spin"></div>';
     api('getAvailability', { date: d, duration: APPT.duration }).then(function (res) {
-      var open = (res.slots || []).filter(function (s) {
-        var h = parseInt(s.time.split(':')[0], 10);
-        return h >= OPEN_HOUR && h < CLOSE_HOUR;
+      var open = res.slots || [];
       });
       if (!open.length) {
         area.innerHTML = '<p class="mg-muted">No open times that day. Try another date.</p>';
