@@ -2020,7 +2020,7 @@ function escapeHtml(value) {
                 const checked = currentServices.some(cs => cs.toLowerCase() === s.name.toLowerCase()) ? 'checked' : '';
                 return `
                     <label class="flex items-center gap-3 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
-                        <input type="checkbox" class="checkbox-custom" value="${s.name}" data-price="${s.price}" data-addon-price="${s.addonPrice}" ${checked} onchange="recalcEditApptPrice()">
+                        <input type="checkbox" class="checkbox-custom" value="${s.name}" data-id="${s.id}" data-price="${s.price}" data-addon-price="${s.addonPrice}" data-duration="${s.duration}" data-addon-duration="${s.addonDuration}" ${checked} onchange="recalcEditApptPrice()">
                         <span>${s.name}</span>
                         <span class="ml-auto text-sm text-gray-500">$${s.price}</span>
                     </label>
@@ -2039,7 +2039,7 @@ function escapeHtml(value) {
             const checkboxes = document.querySelectorAll('#edit-appt-services input[type="checkbox"]:checked');
             let total = 0;
             const count = checkboxes.length;
-            const classANames = ['DEXA Body Composition Scan', 'RMR Resting Metabolic Rate | Fasted Test', 'VO2 Max Treadmill Test'];
+            const classANames = ['DEXA Body Composition Scan', 'RMR Resting Metabolic Rate | Fasted Test', 'Advanced Arterial Assessment', 'VO2 Max Treadmill Test'];
             
             let countA = 0;
             checkboxes.forEach(cb => {
@@ -2061,6 +2061,25 @@ function escapeHtml(value) {
             });
             
             document.getElementById('edit-appt-price').textContent = `$${total.toFixed(2)}`;
+        }
+
+        // Same bundling rule as updateOrderSummary(), applied to duration.
+        function calcEditApptDuration() {
+            const boxes = document.querySelectorAll('#edit-appt-services input[type="checkbox"]:checked');
+            const items = Array.from(boxes).map(cb => ({
+                id: cb.dataset.id,
+                duration: parseInt(cb.dataset.duration) || 0,
+                addonDuration: parseInt(cb.dataset.addonDuration) || 0
+            }));
+            const countA = items.filter(i => CLASS_A_IDS.includes(i.id)).length;
+            let total = 0;
+            items.forEach(i => {
+                const isA = CLASS_A_IDS.includes(i.id);
+                if (countA >= 2)       total += i.addonDuration;
+                else if (countA === 1) total += isA ? i.duration : i.addonDuration;
+                else                   total += i.duration;
+            });
+            return total;
         }
         
         async function saveAppointmentEdit() {
@@ -2088,14 +2107,23 @@ function escapeHtml(value) {
             btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;display:inline-block;"></div> Saving...';
             
             try {
-                const response = await callAppsScript('updateAppointment', {
+                // Only send a duration when the services actually changed. On a pure time move the server keeps the event's existing length, so a manually-resized appointment isn't snapped back.
+                const origNorm = (editApptState.services || '').split(',')
+                    .map(s => s.trim().toLowerCase()).filter(Boolean).sort().join('|');
+                const newNorm = newServices
+                    .map(s => s.trim().toLowerCase()).filter(Boolean).sort().join('|');
+
+                const payload = {
                     email: email,
                     oldTime: editApptState.originalTime,
                     newDate: newDate,
                     newTime: newTime,
                     newServices: newServices,
                     newPrice: newPrice
-                });
+                };
+                if (origNorm !== newNorm) payload.newDuration = calcEditApptDuration();
+
+                const response = await callAppsScript('updateAppointment', payload);
                 
                 if (response.error) {
                     alert(response.error);
@@ -5683,6 +5711,290 @@ async function callAppsScript(action, data = {}) {
             Admin
         </div>
     </div>
+
+<!-- ============================================================
+     SELF-SERVICE RESCHEDULE / CANCEL
+     Does nothing unless the URL contains ?manage=<token>.
+     All classes are mg- prefixed so nothing collides with rest of page.
+     ============================================================ -->
+<style>
+  #mgOverlay{position:fixed;inset:0;z-index:99999;display:none;overflow-y:auto;
+    background:#f4f6fa;font-family:'Montserrat',-apple-system,Segoe UI,sans-serif;
+    color:#1a1e2c;line-height:1.5;padding:28px 16px 64px;-webkit-font-smoothing:antialiased}
+  #mgOverlay.mg-on{display:block}
+  .mg-wrap{max-width:520px;margin:0 auto}
+  .mg-logo{text-align:center;font-weight:700;font-size:20px;letter-spacing:-.02em;margin-bottom:22px}
+  .mg-logo i{color:#46A5FC;font-style:normal}
+  .mg-card{background:#fff;border:1px solid #e2e6ee;border-radius:12px;
+    box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.04);padding:24px;margin-bottom:16px}
+  .mg-ticket{background:#fff;border:1px solid #e2e6ee;border-radius:12px;overflow:hidden;
+    box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.04);margin-bottom:16px}
+  .mg-tt{background:#46A5FC;color:#fff;padding:14px 20px}
+  .mg-tt .mg-eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.08em;opacity:.85;font-weight:600}
+  .mg-tt .mg-when{font-size:17px;font-weight:600;margin-top:2px}
+  .mg-tb{padding:14px 20px}
+  .mg-row{display:flex;justify-content:space-between;gap:16px;padding:5px 0;font-size:14px}
+  .mg-row span:first-child{color:#6b7280}
+  .mg-row span:last-child{font-weight:500;text-align:right}
+  #mgOverlay h2{font-size:17px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
+  .mg-sub{font-size:14px;color:#6b7280;margin:0 0 18px}
+  .mg-btn{display:block;width:100%;padding:13px 18px;border-radius:8px;border:1px solid transparent;
+    font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:.15s ease;
+    text-align:center;text-decoration:none;box-sizing:border-box}
+  .mg-btn:focus-visible{outline:2px solid #46A5FC;outline-offset:2px}
+  .mg-primary{background:#46A5FC;color:#fff}
+  .mg-primary:hover:not(:disabled){background:#2d8ad9}
+  .mg-primary:disabled{opacity:.5;cursor:not-allowed}
+  .mg-ghost{background:transparent;color:#6b7280;border-color:#e2e6ee;margin-top:10px}
+  .mg-ghost:hover{border-color:#9ca3af;color:#1a1e2c}
+  .mg-dangerline{background:transparent;color:#ef4444;border-color:#fecaca;margin-top:10px}
+  .mg-dangerline:hover{background:#fef2f2}
+  .mg-dangerfill{background:#ef4444;color:#fff;border-color:#ef4444}
+  #mgOverlay label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+  #mgDate{width:100%;padding:11px 13px;border:1px solid #e2e6ee;border-radius:8px;
+    font-family:inherit;font-size:15px;color:#1a1e2c;background:#fff;box-sizing:border-box}
+  #mgDate:focus{outline:none;border-color:#46A5FC;box-shadow:0 0 0 3px rgba(70,165,252,.15)}
+  .mg-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px;margin-top:14px}
+  .mg-slot{padding:10px 4px;border:1px solid #e2e6ee;border-radius:8px;background:#fff;
+    font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:.12s ease}
+  .mg-slot:hover{border-color:#46A5FC;color:#2d8ad9}
+  .mg-slot[aria-pressed=true]{background:#46A5FC;border-color:#46A5FC;color:#fff}
+  .mg-note{font-size:13px;color:#6b7280;text-align:center;line-height:1.6;margin:0}
+  .mg-muted{font-size:13px;color:#9ca3af;text-align:center;margin:12px 0 0}
+  .mg-note a,.mg-muted a{color:#2d8ad9;font-weight:600}
+  .mg-alert{padding:12px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;line-height:1.5;
+    background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+  .mg-hide{display:none}
+  .mg-spin{width:22px;height:22px;border:2px solid #e2e6ee;border-top-color:#46A5FC;
+    border-radius:50%;animation:mgspin .7s linear infinite;margin:8px auto}
+  @keyframes mgspin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.mg-spin{animation-duration:2s}}
+</style>
+
+<div id="mgOverlay">
+  <div class="mg-wrap">
+    <div class="mg-logo">Dexa<i>Fit</i> KC</div>
+
+    <div id="mgLoading" class="mg-card">
+      <div class="mg-spin"></div>
+      <p class="mg-note">Looking up your appointment&hellip;</p>
+    </div>
+
+    <div id="mgInvalid" class="mg-card mg-hide">
+      <h2>This link isn't valid anymore</h2>
+      <p class="mg-sub">It may have expired, or the appointment may already have been changed or cancelled.</p>
+      <p class="mg-note">Call or text <a href="tel:9134443141">913.444.3141</a> or email
+        <a href="mailto:kc@dexafit.com">kc@dexafit.com</a> and we'll sort it out.</p>
+      <button class="mg-btn mg-ghost" onclick="location.href=location.pathname">Book a new appointment</button>
+    </div>
+
+    <div id="mgMain" class="mg-hide">
+      <div class="mg-ticket">
+        <div class="mg-tt">
+          <div class="mg-eyebrow">Your appointment</div>
+          <div class="mg-when" id="mgWhen"></div>
+        </div>
+        <div class="mg-tb">
+          <div class="mg-row"><span>Name</span><span id="mgName"></span></div>
+          <div class="mg-row"><span>Services</span><span id="mgSvc"></span></div>
+          <div class="mg-row"><span>Length</span><span id="mgDur"></span></div>
+          <div class="mg-row"><span>Location</span><span>14008 W 135th St, Olathe</span></div>
+        </div>
+      </div>
+
+      <div id="mgMenu" class="mg-card">
+        <h2>Need to make a change?</h2>
+        <p class="mg-sub">Pick a new time or cancel below. Your services and price stay the same.</p>
+        <button class="mg-btn mg-primary" id="mgGoResched">Pick a new time</button>
+        <button class="mg-btn mg-dangerline" id="mgGoCancel">Cancel appointment</button>
+        <p class="mg-muted">Prefer to talk to someone? Call or text
+          <a href="tel:9134443141">913.444.3141</a> or email
+          <a href="mailto:kc@dexafit.com">kc@dexafit.com</a>.</p>
+      </div>
+
+      <div id="mgLocked" class="mg-card mg-hide">
+        <h2>Let's do this one together</h2>
+        <p class="mg-sub" id="mgLockedTxt"></p>
+        <a class="mg-btn mg-primary" href="tel:9134443141">Call or text 913.444.3141</a>
+        <a class="mg-btn mg-ghost" href="mailto:kc@dexafit.com">Email kc@dexafit.com</a>
+      </div>
+
+      <div id="mgResched" class="mg-card mg-hide">
+        <div id="mgMsgR"></div>
+        <h2>Pick a new time</h2>
+        <p class="mg-sub">Choose a day, then an available start time.</p>
+        <label for="mgDate">New date</label>
+        <input type="date" id="mgDate">
+        <div id="mgSlots"></div>
+        <button class="mg-btn mg-primary mg-hide" id="mgConfirmR">Confirm new time</button>
+        <button class="mg-btn mg-ghost" id="mgBackR">Never mind</button>
+      </div>
+
+      <div id="mgCancel" class="mg-card mg-hide">
+        <div id="mgMsgC"></div>
+        <h2>Cancel this appointment?</h2>
+        <p class="mg-sub">This releases your time slot. Any credits or packages on your account stay yours.</p>
+        <button class="mg-btn mg-dangerfill" id="mgConfirmC">Yes, cancel it</button>
+        <button class="mg-btn mg-ghost" id="mgBackC">Keep my appointment</button>
+      </div>
+    </div>
+
+    <div id="mgDone" class="mg-card mg-hide">
+      <h2 id="mgDoneH"></h2>
+      <p class="mg-sub" id="mgDoneP"></p>
+      <p class="mg-note">Questions? Call or text <a href="tel:9134443141">913.444.3141</a>
+        or email <a href="mailto:kc@dexafit.com">kc@dexafit.com</a>.</p>
+      <button class="mg-btn mg-ghost" onclick="location.href=location.pathname">Back to booking</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var TOKEN = new URLSearchParams(location.search).get('manage');
+  if (!TOKEN) return;                       // normal booking page, do nothing
+
+  // Business hours shown on the reschedule picker. Adjust to your real hours.
+  var OPEN_HOUR = 0, CLOSE_HOUR = 24;
+
+  var URL_ = (window.CONFIG && window.CONFIG.APPS_SCRIPT_URL) ||
+    'https://script.google.com/macros/s/AKfycbyUCDh4GLd3nHyxh7Mil5Q6HUXJASbUC6ihuWIa_4tyW5j0SXYyFa766Fax31AMqZwfWw/exec';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var APPT = null, picked = null;
+
+  $('mgOverlay').classList.add('mg-on');
+  document.documentElement.style.overflow = 'hidden';
+
+  function api(action, body) {
+    return fetch(URL_, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ action: action }, body || {}))
+    }).then(function (r) { return r.text(); }).then(function (t) {
+      if (t.charAt(0) === '<') throw new Error('Something went wrong on our end. Please try again.');
+      var j = JSON.parse(t);
+      if (j.error) throw new Error(j.error);
+      return j;
+    });
+  }
+  function show(id) {
+    ['mgMenu', 'mgResched', 'mgCancel', 'mgLocked'].forEach(function (v) { $(v).classList.add('mg-hide'); });
+    $(id).classList.remove('mg-hide');
+  }
+  function alertIn(id, txt) {
+    $(id).innerHTML = txt ? '<div class="mg-alert">' + txt + '</div>' : '';
+  }
+  function finish(h, p) {
+    $('mgMain').classList.add('mg-hide');
+    $('mgDoneH').textContent = h;
+    $('mgDoneP').textContent = p;
+    $('mgDone').classList.remove('mg-hide');
+    $('mgOverlay').scrollTop = 0;
+  }
+  function dead() {
+    $('mgLoading').classList.add('mg-hide');
+    $('mgInvalid').classList.remove('mg-hide');
+  }
+
+  api('getApptByToken', { token: TOKEN }).then(function (a) {
+    APPT = a;
+    $('mgWhen').textContent = a.startPretty;
+    $('mgName').textContent = a.name || '';
+    $('mgSvc').textContent = a.services || '';
+    $('mgDur').textContent = a.duration + ' minutes';
+    $('mgLoading').classList.add('mg-hide');
+    $('mgMain').classList.remove('mg-hide');
+    if (!a.canSelfServe) {
+      $('mgLockedTxt').textContent = 'Your appointment is less than ' + a.cutoffHours +
+        ' hours away, so changes go through our team. We are happy to help \u2014 it only takes a minute.';
+      show('mgLocked');
+    }
+  }).catch(dead);
+
+  $('mgGoResched').onclick = function () {
+    var min = new Date(Date.now() + APPT.cutoffHours * 3600000);
+    $('mgDate').min = min.getFullYear() + '-' +
+      String(min.getMonth() + 1).padStart(2, '0') + '-' + String(min.getDate()).padStart(2, '0');
+    $('mgDate').value = '';
+    $('mgSlots').innerHTML = '';
+    $('mgConfirmR').classList.add('mg-hide');
+    picked = null;
+    alertIn('mgMsgR', '');
+    show('mgResched');
+  };
+  $('mgBackR').onclick = function () { show('mgMenu'); };
+  $('mgGoCancel').onclick = function () { alertIn('mgMsgC', ''); show('mgCancel'); };
+  $('mgBackC').onclick = function () { show('mgMenu'); };
+
+  $('mgDate').onchange = loadSlots;
+
+  function loadSlots() {
+    var d = $('mgDate').value;
+    picked = null;
+    $('mgConfirmR').classList.add('mg-hide');
+    if (!d) return;
+    var area = $('mgSlots');
+    area.innerHTML = '<div class="mg-spin"></div>';
+    api('getAvailability', { date: d, duration: APPT.duration }).then(function (res) {
+      var open = (res.slots || []).filter(function (s) {
+        var h = parseInt(s.time.split(':')[0], 10);
+        return h >= OPEN_HOUR && h < CLOSE_HOUR;
+      });
+      if (!open.length) {
+        area.innerHTML = '<p class="mg-muted">No open times that day. Try another date.</p>';
+        return;
+      }
+      area.innerHTML = '<div class="mg-slots">' + open.map(function (s) {
+        var p = s.time.split(':'), h = parseInt(p[0], 10);
+        var label = ((h % 12) || 12) + ':' + p[1] + ' ' + (h < 12 ? 'AM' : 'PM');
+        return '<button type="button" class="mg-slot" aria-pressed="false" data-t="' +
+          s.time + '">' + label + '</button>';
+      }).join('') + '</div>';
+      Array.prototype.forEach.call(area.querySelectorAll('.mg-slot'), function (b) {
+        b.onclick = function () {
+          Array.prototype.forEach.call(area.querySelectorAll('.mg-slot'),
+            function (x) { x.setAttribute('aria-pressed', 'false'); });
+          b.setAttribute('aria-pressed', 'true');
+          picked = b.dataset.t;
+          $('mgConfirmR').classList.remove('mg-hide');
+        };
+      });
+    }).catch(function (e) { area.innerHTML = ''; alertIn('mgMsgR', e.message); });
+  }
+
+  $('mgConfirmR').onclick = function () {
+    if (!picked) return;
+    var b = $('mgConfirmR');
+    b.disabled = true; b.textContent = 'Moving your appointment\u2026';
+    api('selfReschedule', { token: TOKEN, newDate: $('mgDate').value, newTime: picked })
+      .then(function (res) {
+        finish('You are all set', 'Your appointment is now ' + res.startPretty +
+          '. We just emailed you an updated confirmation with a new link for future changes.');
+      })
+      .catch(function (e) {
+        b.disabled = false; b.textContent = 'Confirm new time';
+        alertIn('mgMsgR', e.message);
+        loadSlots();                        // that slot may have just been taken
+      });
+  };
+
+  $('mgConfirmC').onclick = function () {
+    var b = $('mgConfirmC');
+    b.disabled = true; b.textContent = 'Cancelling\u2026';
+    api('selfCancel', { token: TOKEN })
+      .then(function () {
+        finish('Your appointment is cancelled',
+          'We released the time slot and emailed you a confirmation. You can book again any time.');
+      })
+      .catch(function (e) {
+        b.disabled = false; b.textContent = 'Yes, cancel it';
+        alertIn('mgMsgC', e.message);
+      });
+  };
+})();
+</script>
+<!-- ===== end self-service block ===== -->        
 </body>
 
 </html>
