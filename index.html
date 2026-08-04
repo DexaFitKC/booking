@@ -5935,7 +5935,6 @@ async function callAppsScript(action, data = {}) {
     area.innerHTML = '<div class="mg-spin"></div>';
     api('getAvailability', { date: d, duration: APPT.duration }).then(function (res) {
       var open = res.slots || [];
-      });
       if (!open.length) {
         area.innerHTML = '<p class="mg-muted">No open times that day. Try another date.</p>';
         return;
