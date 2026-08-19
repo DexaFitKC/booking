@@ -1344,7 +1344,7 @@ function runMktgFilter() {
 
 // Non-ad sources. Compared case-insensitively against the trimmed referrer,
 // so "Website1" / "website1" both match. Add new house sources here.
-const NON_AD_REFERRERS = ['website1', 'googleprof', 'clinical_trial'];
+const NON_AD_REFERRERS = ['website1', 'googleprof', 'clinical_trial', 'dexakc'];
 
 function isAdReferrer(ref) {
   const r = (ref || '').toString().trim().toLowerCase();
